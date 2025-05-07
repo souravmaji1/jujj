@@ -36,7 +36,7 @@ export async function POST(request) {
     };
     console.log('Dispatching workflow with props:', JSON.stringify(props));
 
-    const githubToken = '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';
+    const githubToken = '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';
     const repoOwner = 'souravmaji1';
     const repoName = 'jujj';
 

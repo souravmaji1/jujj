@@ -254,7 +254,7 @@ export default function AudioVideoSyncPage() {
     setRenderMessage('Rendering video...');
 
     try {
-      const response = await fetch('/api/render', {
+      const response = await fetch('/api/render-video', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
