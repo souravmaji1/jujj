@@ -20,25 +20,45 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Install FFmpeg and jq
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg jq
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: Download Video from Supabase
+      - name: Download Video Clips from Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          VIDEO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
-          echo "Downloading video from $VIDEO_URL"
-          curl -L -o input.mp4 "$VIDEO_URL" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZXI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
-            --fail --silent --show-error 2>&1 | tee download_error.log
+          VIDEO_PATHS='${{ toJson(github.event.client_payload.videoPaths) }}'
+          echo "Video paths: $VIDEO_PATHS"
+          mkdir -p videos
+          INDEX=0
+          for VIDEO_PATH in $(echo $VIDEO_PATHS | jq -r '.[]'); do
+            VIDEO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/$VIDEO_PATH"
+            echo "Downloading video $INDEX from $VIDEO_URL"
+            curl -L -o "videos/input_$INDEX.mp4" "$VIDEO_URL" \
+              -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
+              --fail --silent --show-error
+            if [ $? -ne 0 ]; then
+              echo "Error: Failed to download video $VIDEO_PATH from Supabase"
+              exit 1
+            fi
+            ls -l "videos/input_$INDEX.mp4"  # Verify the file exists
+            ((INDEX++))
+          done
+
+      - name: Combine Video Clips
+        run: |
+          echo "Combining video clips..."
+          ls videos/input_*.mp4 | while read -r file; do
+            echo "file '$file'" >> filelist.txt
+          done
+          cat filelist.txt
+          ffmpeg -f concat -safe 0 -i filelist.txt -an -c:v copy combined.mp4
           if [ $? -ne 0 ]; then
-            echo "Error: Failed to download video ${{ github.event.client_payload.videoPath }} from Supabase"
-            cat download_error.log
+            echo "Error: Failed to combine videos with FFmpeg"
             exit 1
           fi
-          ls -l input.mp4  # Verify the file exists
+          ls -l combined.mp4  # Verify the combined file exists
 
       - name: Download Audio from Supabase
         if: ${{ github.event.client_payload.audioPath }}
@@ -46,15 +66,13 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          AUDIO_PATH=$(echo "${{ github.event.client_payload.audioPath }}" | jq -r '@uri')
-          AUDIO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/$AUDIO_PATH"
+          AUDIO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.audioPath }}"
           echo "Downloading audio from $AUDIO_URL"
           curl -L -o input_audio.mp3 "$AUDIO_URL" \
             -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
-            --fail --silent --show-error 2>&1 | tee audio_download_error.log
+            --fail --silent --show-error
           if [ $? -ne 0 ]; then
-            echo "Error: Failed to download audio $AUDIO_PATH from Supabase"
-            cat audio_download_error.log
+            echo "Error: Failed to download audio from Supabase"
             exit 1
           fi
           ls -l input_audio.mp3  # Verify the file exists
@@ -64,7 +82,7 @@ jobs:
           SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
           STYLE_TYPE: ${{ github.event.client_payload.styleType }}
           OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
-          VIDEO_PATH: file:///${{ github.workspace }}/input.mp4
+          VIDEO_PATH: file:///${{ github.workspace }}/combined.mp4
           AUDIO_PATH: ${{ github.event.client_payload.audioPath && format('file:///{0}/input_audio.mp3', github.workspace) || '' }}
           DURATION: ${{ github.event.client_payload.duration }}
         run: |
