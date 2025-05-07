@@ -20,28 +20,13 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Construct Supabase URLs
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-        run: |
-          VIDEO_PATHS='${{ toJson(github.event.client_payload.videoUrls) }}'
-          echo "Video paths: $VIDEO_PATHS"
-          VIDEO_URLS_JSON=$(echo $VIDEO_PATHS | jq -c '[.[] | "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/\(.)"]')
-          echo "VIDEO_URLS=$VIDEO_URLS_JSON" >> $GITHUB_ENV
-          if [ -n "${{ github.event.client_payload.audioPath }}" ]; then
-            AUDIO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.audioPath }}"
-            echo "AUDIO_URL=$AUDIO_URL" >> $GITHUB_ENV
-          else
-            echo "AUDIO_URL=" >> $GITHUB_ENV
-          fi
-
       - name: Render Video with Remotion
         env:
           SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
           STYLE_TYPE: ${{ github.event.client_payload.styleType }}
           OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
-          VIDEO_URLS: ${{ env.VIDEO_URLS }}
-          AUDIO_URL: ${{ env.AUDIO_URL }}
+          VIDEO_URLS: ${{ toJson(github.event.client_payload.videoUrls) }}
+          AUDIO_URL: ${{ github.event.client_payload.audioUrl }}
           DURATION: ${{ github.event.client_payload.duration }}
         run: |
           echo "Rendering video with props:"
@@ -53,8 +38,12 @@ jobs:
           echo "Output File: $OUTPUT_FILE"
           npx remotion render VideoWithSubtitlesAndAudio \
             --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"subtitles\": $SUBTITLES, \"styleType\": \"$STYLE_TYPE\", \"duration\": $DURATION}" \
-            --output="$OUTPUT_FILE.mp4"
-        
+            --output="$OUTPUT_FILE"
+          if [ $? -ne 0 ]; then
+            echo "Error: Failed to render video with Remotion"
+            exit 1
+          fi
+          ls -l "$OUTPUT_FILE"  # Verify the output file exists
 
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4
