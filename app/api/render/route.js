@@ -3,11 +3,11 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
-    const { videoPaths, audioPath, subtitles, styleType, segmentIndex, duration } = await request.json();
-    console.log('Render-video API received:', { videoPaths, audioPath, subtitles, styleType, segmentIndex, duration });
+    const { videoUrls, audioUrl, subtitles, styleType, segmentIndex, duration } = await request.json();
+    console.log('Render-video API received:', { videoUrls, audioUrl, subtitles, styleType, segmentIndex, duration });
 
-    if (!videoPaths || !Array.isArray(videoPaths) || videoPaths.length === 0 || !duration) {
-      return NextResponse.json({ error: 'Video paths array and duration are required' }, { status: 400 });
+    if (!videoUrls || !Array.isArray(videoUrls) || videoUrls.length === 0 || !duration) {
+      return NextResponse.json({ error: 'Video URLs array and duration are required' }, { status: 400 });
     }
 
     const validStyles = ['none', 'hormozi', 'abdaal', 'neonGlow', 'retroWave', 'minimalPop'];
@@ -20,8 +20,8 @@ export async function POST(request) {
     }
 
     const props = {
-      videoUrls: videoPaths, // Pass array of video paths
-      audioPath: audioPath || '',
+      videoUrls, // Array of full Supabase URLs
+      audioUrl: audioUrl || '',
       subtitles: subtitles && Array.isArray(subtitles) ? subtitles : [],
       styleType,
       duration,
@@ -29,7 +29,7 @@ export async function POST(request) {
     };
     console.log('Dispatching workflow with props:', JSON.stringify(props));
 
-    const githubToken = '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';
+    const githubToken = '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';
     const repoOwner = 'souravmaji1';
     const repoName = 'jujj';
 

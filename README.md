@@ -17,6 +17,6 @@ Second platform: needs to have perfect quality, because reputation matters.
 
 Waiting for your feedback!
 
- const githubToken = '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';
+ const githubToken = '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';
       const repoOwner = 'souravmaji1';
       const repoName = 'jujj';

@@ -162,7 +162,7 @@ export default function AudioVideoSyncPage() {
             url: publicUrlData.publicUrl, // Use Supabase URL for rendering
             name: file.name,
             duration: audioEl.duration,
-            path: audioFileName // Store path for API call
+            path: audioFileName // Store path for reference
           });
           setMessage(`Audio "${file.name}" uploaded successfully.`);
         };
@@ -210,7 +210,7 @@ export default function AudioVideoSyncPage() {
             name: file.name,
             duration: loadedVideo.duration,
             thumbnail,
-            path: videoFileName // Store path for API call
+            path: videoFileName // Store path for reference
           };
         }));
         setVideoClips(prev => [...prev, ...newClips]);
@@ -274,16 +274,16 @@ export default function AudioVideoSyncPage() {
     setIsRendering(true);
     setMessage('Rendering video... This may take a few minutes.');
     try {
-      const videoPaths = videoClips.map(clip => clip.path);
-      const audioPath = audioFile?.path || '';
-      const response = await fetch('/api/render-video', {
+      const videoUrls = videoClips.map(clip => clip.url); // Use full Supabase URLs
+      const audioUrl = audioFile?.url || ''; // Use full Supabase URL
+      const response = await fetch('/api/render', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          videoPaths,
-          audioPath,
+          videoUrls,
+          audioUrl,
           subtitles: [], // Add subtitles if needed
           styleType: 'none', // Default style, modify if needed
           segmentIndex: 0, // Can be dynamic if needed
