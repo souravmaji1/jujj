@@ -16,3 +16,7 @@ First platform: move fast, semi-ready product to test reactions.
 Second platform: needs to have perfect quality, because reputation matters.
 
 Waiting for your feedback!
+
+ const githubToken = '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';
+      const repoOwner = 'souravmaji1';
+      const repoName = 'jujj';
