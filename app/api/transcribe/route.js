@@ -117,7 +117,7 @@ export async function POST(request) {
     };
     console.log('Dispatching workflow with props:', JSON.stringify(props));
 
-    const githubToken = process.env.GITHUB_TOKEN; // Use environment variable
+    const githubToken = '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'; // Use environment variable
     const repoOwner = 'souravmaji1';
     const repoName = 'jujj';
 

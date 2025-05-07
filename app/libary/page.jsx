@@ -3,11 +3,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { 
-  Upload, Video, Music, Folder, CheckCircle, ChevronDown, ChevronRight, Home, Settings, Users, 
-  BarChart2, HelpCircle, Plus, Sparkles, Clock, Zap, BookOpen, Trash2, Play
+  Upload, Video, Music, CheckCircle, ChevronDown, ChevronRight, Home, Settings, Users, 
+  BarChart2, HelpCircle, Plus, Sparkles, Clock, Zap, BookOpen, Trash2, Play, Download
 } from 'lucide-react';
 import { Player } from '@remotion/player';
-import { AbsoluteFill, Audio, Video as RemotionVideo } from 'remotion';
+import { AbsoluteFill, Audio, Sequence, Video as RemotionVideo } from 'remotion';
 import { motion } from 'framer-motion';
 
 // Initialize Supabase client
@@ -16,16 +16,35 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// Remotion Video Component for Preview (Single Clip)
-const VideoClipPreview = ({ videoUrl, durationInFrames }) => {
+// Remotion Video Component
+const CombinedVideoWithAudio = ({ videoClips, audioUrl, totalDuration }) => {
+  let currentFrame = 0;
+
   return (
     <AbsoluteFill>
-      {videoUrl && (
-        <RemotionVideo
-          src={videoUrl}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      {videoClips.map((clip, index) => {
+        const startFrame = currentFrame;
+        const clipDurationInFrames = Math.ceil(clip.duration * 30); // 30 FPS
+        currentFrame += clipDurationInFrames;
+
+        return (
+          <Sequence
+            key={index}
+            from={startFrame}
+            durationInFrames={clipDurationInFrames}
+          >
+            <RemotionVideo
+              src={clip.url}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </Sequence>
+        );
+      })}
+      {audioUrl && (
+        <Audio
+          src={audioUrl}
           startFrom={0}
-          endAt={durationInFrames}
+          endAt={Math.ceil(totalDuration * 30)}
         />
       )}
     </AbsoluteFill>
@@ -55,17 +74,14 @@ export default function AudioVideoSyncPage() {
   const [message, setMessage] = useState('');
   const [audioFile, setAudioFile] = useState(null);
   const [videoClips, setVideoClips] = useState([]);
+  const [totalDuration, setTotalDuration] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [particleStyles, setParticleStyles] = useState([]);
   const [isRendering, setIsRendering] = useState(false);
-  const [renderMessage, setRenderMessage] = useState('');
-  const [videoPaths, setVideoPaths] = useState([]); // Supabase paths for video clips
-  const [audioPath, setAudioPath] = useState(''); // Supabase path for audio
+  const [renderedVideoUrl, setRenderedVideoUrl] = useState(null);
   const audioInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const videoPlayerRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [particleStyles, setParticleStyles] = useState([]);
-  const [selectedClipIndex, setSelectedClipIndex] = useState(0); // For previewing individual clips
-  const [totalDuration, setTotalDuration] = useState(0);
 
   // Generate particle styles
   useEffect(() => {
@@ -77,6 +93,12 @@ export default function AudioVideoSyncPage() {
     }));
     setParticleStyles(styles);
   }, []);
+
+  // Calculate total duration when videoClips change
+  useEffect(() => {
+    const total = videoClips.reduce((sum, clip) => sum + clip.duration, 0);
+    setTotalDuration(total);
+  }, [videoClips]);
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
@@ -117,7 +139,7 @@ export default function AudioVideoSyncPage() {
         setMessage('Please upload a valid audio file.');
         return;
       }
-      setMessage('Analyzing audio...');
+      setMessage('Uploading audio...');
       try {
         const audioEl = document.createElement('audio');
         audioEl.preload = 'metadata';
@@ -131,13 +153,17 @@ export default function AudioVideoSyncPage() {
             setMessage('Error uploading audio to Supabase: ' + error.message);
             return;
           }
+          // Get public URL for the uploaded audio
+          const { data: publicUrlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(audioFileName);
           setAudioFile({
             file,
-            url: URL.createObjectURL(file),
+            url: publicUrlData.publicUrl, // Use Supabase URL for rendering
             name: file.name,
-            duration: audioEl.duration
+            duration: audioEl.duration,
+            path: audioFileName // Store path for API call
           });
-          setAudioPath(data.path);
           setMessage(`Audio "${file.name}" uploaded successfully.`);
         };
         audioEl.src = URL.createObjectURL(file);
@@ -155,7 +181,7 @@ export default function AudioVideoSyncPage() {
         setMessage('Please upload valid video files.');
         return;
       }
-      setMessage('Analyzing and uploading video clips...');
+      setMessage('Uploading video clips...');
       try {
         const newClips = await Promise.all(validFiles.map(async (file) => {
           const videoEl = document.createElement('video');
@@ -166,7 +192,7 @@ export default function AudioVideoSyncPage() {
           videoEl.src = URL.createObjectURL(file);
           const loadedVideo = await metadataLoaded;
           const thumbnail = await getVideoThumbnail(file);
-          // Upload video clip to Supabase
+          // Upload video to Supabase
           const videoFileName = `video_${Date.now()}_${file.name}`;
           const { data, error } = await supabase.storage
             .from('avatars')
@@ -174,22 +200,23 @@ export default function AudioVideoSyncPage() {
           if (error) {
             throw new Error(`Error uploading video ${file.name}: ${error.message}`);
           }
+          // Get public URL for the uploaded video
+          const { data: publicUrlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(videoFileName);
           return {
             file,
-            url: URL.createObjectURL(file),
+            url: publicUrlData.publicUrl, // Use Supabase URL for rendering
             name: file.name,
             duration: loadedVideo.duration,
             thumbnail,
-            path: data.path
+            path: videoFileName // Store path for API call
           };
         }));
         setVideoClips(prev => [...prev, ...newClips]);
-        setVideoPaths(prev => [...prev, ...newClips.map(clip => clip.path)]);
-        const total = newClips.reduce((sum, clip) => sum + clip.duration, 0) + totalDuration;
-        setTotalDuration(total);
         setMessage(`${validFiles.length} video clip(s) uploaded successfully.`);
       } catch (error) {
-        setMessage('Error analyzing or uploading video clips: ' + error.message);
+        setMessage('Error uploading video clips: ' + error.message);
       }
     }
   };
@@ -218,13 +245,8 @@ export default function AudioVideoSyncPage() {
     const newClips = [...videoClips];
     if (newClips[index]?.url) URL.revokeObjectURL(newClips[index].url);
     if (newClips[index]?.thumbnail) URL.revokeObjectURL(newClips[index].thumbnail);
-    const removedClip = newClips.splice(index, 1)[0];
+    newClips.splice(index, 1);
     setVideoClips(newClips);
-    setVideoPaths(newClips.map(clip => clip.path));
-    setTotalDuration(prev => prev - removedClip.duration);
-    if (selectedClipIndex >= newClips.length) {
-      setSelectedClipIndex(Math.max(0, newClips.length - 1));
-    }
   };
 
   const formatDuration = (seconds) => {
@@ -245,48 +267,39 @@ export default function AudioVideoSyncPage() {
   const triggerVideoInput = () => videoInputRef.current?.click();
 
   const handleRenderVideo = async () => {
-    if (videoPaths.length === 0) {
-      setRenderMessage('No video clips available to render.');
+    if (videoClips.length === 0) {
+      setMessage('Please upload at least one video clip to render.');
       return;
     }
-
     setIsRendering(true);
-    setRenderMessage('Rendering video...');
-
+    setMessage('Rendering video... This may take a few minutes.');
     try {
+      const videoPaths = videoClips.map(clip => clip.path);
+      const audioPath = audioFile?.path || '';
       const response = await fetch('/api/render-video', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          videoPaths, // Send array of video clip paths
+          videoPaths,
           audioPath,
-          subtitles: [], // Placeholder: Add subtitle generation logic if needed
-          styleType: 'none', // Default style, can be made selectable
-          segmentIndex: 0,
-          duration: totalDuration,
-        }),
+          subtitles: [], // Add subtitles if needed
+          styleType: 'none', // Default style, modify if needed
+          segmentIndex: 0, // Can be dynamic if needed
+          duration: totalDuration
+        })
       });
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to render video');
       }
-
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `rendered_video_${Date.now()}.mp4`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      setRenderMessage('Video rendered and downloaded successfully.');
+      setRenderedVideoUrl(url);
+      setMessage('Video rendered successfully! Download the video below.');
     } catch (error) {
-      setRenderMessage(`Error rendering video: ${error.message}`);
+      setMessage('Error rendering video: ' + error.message);
     } finally {
       setIsRendering(false);
     }
@@ -388,16 +401,16 @@ export default function AudioVideoSyncPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-8">
               <div className="hidden md:flex space-x-4">
-                <a href="#" className="text-gray-400 hover:text-white text-body transition">Tutorials</a>
-                <a href="#" className="text-gray-400 hover:text-white text-body transition">Templates</a>
-                <a href="#" className="text-gray-400 hover:text-white text-body transition">Support</a>
+                <a href="#" className="text-gray-400 hover:text-white text-sm transition">Tutorials</a>
+                <a href="#" className="text-gray-400 hover:text-white text-sm transition">Templates</a>
+                <a href="#" className="text-gray-400 hover:text-white text-sm transition">Support</a>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <button className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-gray-800/50 transition">
                 <HelpCircle size={20} />
               </button>
-              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-body font-medium">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-sm font-medium">
                 {user?.firstName?.charAt(0) || 'U'}
               </div>
             </div>
@@ -464,11 +477,10 @@ export default function AudioVideoSyncPage() {
                     </div>
                     <p className="text-gray-300 mb-2">Audio uploaded</p>
                     <h3 className="text-lg font-medium mb-2">{audioFile.name}</h3>
-                    <p className="text-body text-gray-400 mb-4">Duration: {formatDuration(audioFile.duration)}</p>
+                    <p className="text-sm text-gray-400 mb-4">Duration: {formatDuration(audioFile.duration)}</p>
                     <button 
                       onClick={() => {
                         setAudioFile(null);
-                        setAudioPath('');
                       }}
                       className="px-6 py-3 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium transition-all">
                       <Trash2 size={18} className="mr-2 inline" /> Remove Audio
@@ -516,7 +528,7 @@ export default function AudioVideoSyncPage() {
                       <CheckCircle size={28} className="text-green-400" />
                     </div>
                     <p className="text-gray-300 mb-2">{videoClips.length} video clip(s) uploaded</p>
-                    <p className="text-body text-gray-400 mb-4">Total Duration: {formatDuration(totalDuration)}</p>
+                    <p className="text-sm text-gray-400 mb-4">Total Duration: {formatDuration(totalDuration)}</p>
                     <motion.button
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.98 }}
@@ -527,9 +539,13 @@ export default function AudioVideoSyncPage() {
                   </div>
                 )}
               </motion.div>
+
+              {message && (
+                <p className="mt-6 text-sm text-gray-500 relative z-10">{message}</p>
+              )}
             </div>
 
-            {videoClips.length > 0 && (
+            {videoClips.length > 0 && totalDuration > 0 && (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -539,32 +555,27 @@ export default function AudioVideoSyncPage() {
                 <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-900/30 rounded-full filter blur-3xl animate-pulse"></div>
                 <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-900/30 rounded-full filter blur-3xl animate-pulse"></div>
 
-                <h3 className="text-2xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-blue-300 mb-6">Video Clips Preview</h3>
+                <h3 className="text-2xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-blue-300 mb-6">Video Preview</h3>
                 
                 <div className="flex flex-col md:flex-row gap-6">
                   <div className="w-full md:w-1/3">
                     <div className="relative aspect-[9/16] bg-black rounded-xl overflow-hidden shadow-lg">
-                      {videoClips[selectedClipIndex] ? (
-                        <Player
-                          ref={videoPlayerRef}
-                          component={VideoClipPreview}
-                          inputProps={{
-                            videoUrl: videoClips[selectedClipIndex].url,
-                            durationInFrames: Math.ceil(videoClips[selectedClipIndex].duration * 30)
-                          }}
-                          durationInFrames={Math.ceil(videoClips[selectedClipIndex].duration * 30)}
-                          compositionWidth={607}
-                          compositionHeight={1080}
-                          fps={30}
-                          controls={true}
-                          style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'black' }}
-                          onEnded={() => setIsPlaying(false)}
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center w-full h-full bg-gray-800">
-                          <Video size={40} className="text-gray-600" />
-                        </div>
-                      )}
+                      <Player
+                        ref={videoPlayerRef}
+                        component={CombinedVideoWithAudio}
+                        inputProps={{
+                          videoClips,
+                          audioUrl: audioFile?.url || '',
+                          totalDuration
+                        }}
+                        durationInFrames={Math.ceil(totalDuration * 30)}
+                        compositionWidth={607}
+                        compositionHeight={1080}
+                        fps={30}
+                        controls={true}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'black' }}
+                        onEnded={() => setIsPlaying(false)}
+                      />
                       <div 
                         className="absolute inset-0 flex items-center justify-center cursor-pointer"
                         onClick={togglePlayPause}
@@ -576,37 +587,6 @@ export default function AudioVideoSyncPage() {
                         </motion.div>
                       </div>
                     </div>
-                    <div className="mt-4 flex space-x-2">
-                      {videoClips.map((_, index) => (
-                        <button
-                          key={index}
-                          onClick={() => setSelectedClipIndex(index)}
-                          className={`px-3 py-1 rounded-lg text-body ${selectedClipIndex === index ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-                        >
-                          Clip {index + 1}
-                        </button>
-                      ))}
-                    </div>
-                    <motion.button
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handleRenderVideo}
-                      disabled={isRendering}
-                      className={`mt-4 w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium py-3 px-6 rounded-lg transition-all shadow-xl ${isRendering ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {isRendering ? (
-                        <>
-                          <Sparkles size={18} className="mr-2 inline animate-pulse" /> Rendering...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={18} className="mr-2 inline" /> Render Video
-                        </>
-                      )}
-                    </motion.button>
-                    {renderMessage && (
-                      <p className="mt-2 text-body text-gray-400">{renderMessage}</p>
-                    )}
                   </div>
 
                   <div className="flex-1">
@@ -652,12 +632,36 @@ export default function AudioVideoSyncPage() {
                             </div>
                           </div>
                           <div className="p-3">
-                            <h5 className="font-medium text-body truncate">{clip.name}</h5>
+                            <h5 className="font-medium text-sm truncate">{clip.name}</h5>
                             <div className="text-xs text-gray-400 mt-1">Clip {index + 1}</div>
                           </div>
                         </motion.div>
                       ))}
                     </motion.div>
+                    <div className="mt-6">
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleRenderVideo}
+                        disabled={isRendering}
+                        className={`bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium py-3 px-6 rounded-lg transition-all ${
+                          isRendering ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        <Video size={18} className="mr-2 inline" />
+                        {isRendering ? 'Rendering...' : 'Render Video'}
+                      </motion.button>
+                      {renderedVideoUrl && (
+                        <a
+                          href={renderedVideoUrl}
+                          download="rendered_video.mp4"
+                          className="ml-4 inline-flex items-center bg-green-600 hover:bg-green-500 text-white font-medium py-3 px-6 rounded-lg transition-all"
+                        >
+                          <Download size={18} className="mr-2" />
+                          Download Rendered Video
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </div>
               </motion.div>

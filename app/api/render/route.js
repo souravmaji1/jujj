@@ -1,12 +1,5 @@
 import JSZip from 'jszip';
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
 
 export async function POST(request) {
   try {
@@ -27,7 +20,7 @@ export async function POST(request) {
     }
 
     const props = {
-      videoPaths, // Pass array of video paths
+      videoUrls: videoPaths, // Pass array of video paths
       audioPath: audioPath || '',
       subtitles: subtitles && Array.isArray(subtitles) ? subtitles : [],
       styleType,
@@ -36,7 +29,7 @@ export async function POST(request) {
     };
     console.log('Dispatching workflow with props:', JSON.stringify(props));
 
-    const githubToken = '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';
+    const githubToken = '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';
     const repoOwner = 'souravmaji1';
     const repoName = 'jujj';
 

@@ -20,69 +20,42 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Install FFmpeg and jq
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg jq
-
-      - name: Download Video from Supabase
+      - name: Construct Supabase URLs
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          VIDEO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
-          echo "Downloading video from $VIDEO_URL"
-          curl -L -o input.mp4 "$VIDEO_URL" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZXI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
-            --fail --silent --show-error 2>&1 | tee download_error.log
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to download video ${{ github.event.client_payload.videoPath }} from Supabase"
-            cat download_error.log
-            exit 1
+          VIDEO_PATHS='${{ toJson(github.event.client_payload.videoUrls) }}'
+          echo "Video paths: $VIDEO_PATHS"
+          VIDEO_URLS=$(echo $VIDEO_PATHS | jq -r '.[] | "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/\(.)"')
+          VIDEO_URLS_JSON=$(echo $VIDEO_URLS | jq -R . | jq -s .)
+          echo "VIDEO_URLS=$VIDEO_URLS_JSON" >> $GITHUB_ENV
+          if [ "${{ github.event.client_payload.audioPath }}" ]; then
+            AUDIO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.audioPath }}"
+            echo "AUDIO_URL=$AUDIO_URL" >> $GITHUB_ENV
+          else
+            echo "AUDIO_URL=" >> $GITHUB_ENV
           fi
-          ls -l input.mp4  # Verify the file exists
-
-      - name: Download Audio from Supabase
-        if: ${{ github.event.client_payload.audioPath }}
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-        run: |
-          AUDIO_PATH=$(echo "${{ github.event.client_payload.audioPath }}" | jq -r '@uri')
-          AUDIO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/$AUDIO_PATH"
-          echo "Downloading audio from $AUDIO_URL"
-          curl -L -o input_audio.mp3 "$AUDIO_URL" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
-            --fail --silent --show-error 2>&1 | tee audio_download_error.log
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to download audio $AUDIO_PATH from Supabase"
-            cat audio_download_error.log
-            exit 1
-          fi
-          ls -l input_audio.mp3  # Verify the file exists
 
       - name: Render Video with Remotion
         env:
           SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
           STYLE_TYPE: ${{ github.event.client_payload.styleType }}
           OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
-          VIDEO_PATH: file:///${{ github.workspace }}/input.mp4
-          AUDIO_PATH: ${{ github.event.client_payload.audioPath && format('file:///{0}/input_audio.mp3', github.workspace) || '' }}
+          VIDEO_URLS: ${{ env.VIDEO_URLS }}
+          AUDIO_URL: ${{ env.AUDIO_URL }}
           DURATION: ${{ github.event.client_payload.duration }}
         run: |
           echo "Rendering video with props:"
           echo "Subtitles: $SUBTITLES"
           echo "Style Type: $STYLE_TYPE"
-          echo "Video Path: $VIDEO_PATH"
-          echo "Audio Path: $AUDIO_PATH"
+          echo "Video URLs: $VIDEO_URLS"
+          echo "Audio URL: $AUDIO_URL"
           echo "Duration: $DURATION"
           echo "Output File: $OUTPUT_FILE"
           npx remotion render VideoWithSubtitlesAndAudio \
-            --props "{\"videoUrl\": \"$VIDEO_PATH\", \"audioUrl\": \"$AUDIO_PATH\", \"subtitles\": $SUBTITLES, \"styleType\": \"$STYLE_TYPE\", \"duration\": $DURATION}" \
+            --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"subtitles\": $SUBTITLES, \"styleType\": \"$STYLE_TYPE\", \"duration\": $DURATION}" \
             --output="$OUTPUT_FILE.mp4"
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to render video with Remotion"
-            exit 1
-          fi
-          ls -l "$OUTPUT_FILE"  # Verify the output file exists
+         
 
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4
