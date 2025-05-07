@@ -1,4 +1,4 @@
-import { AbsoluteFill, Audio, Sequence, useVideoConfig, Video as RemotionVideo } from 'remotion';
+import { AbsoluteFill, Audio, Sequence, useVideoConfig, Video as RemotionVideo, Composition } from 'remotion';
 import SubtitleOverlay from '../components/SubtitleOverlay';
 
 export const VideoComposition = ({ videoUrls, audioUrl, subtitles, styleType, duration }) => {
@@ -21,7 +21,7 @@ export const VideoComposition = ({ videoUrls, audioUrl, subtitles, styleType, du
   return (
     <AbsoluteFill>
       {videoUrls.map((videoUrl, index) => {
-        const clipDurationInFrames = Math.ceil(duration * fps / videoUrls.length); // Distribute duration evenly or adjust based on metadata if available
+        const clipDurationInFrames = Math.ceil(duration * fps / videoUrls.length); // Distribute duration evenly
         const startFrame = currentFrame;
         currentFrame += clipDurationInFrames;
 
@@ -57,7 +57,7 @@ export const RemotionComposition = () => {
     <Composition
       id="VideoWithSubtitlesAndAudio"
       component={VideoComposition}
-      durationInFrames={30 * 30}
+      durationInFrames={30 * 30} // Default duration, overridden by props
       fps={30}
       width={606}
       height={1080}
