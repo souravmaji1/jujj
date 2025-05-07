@@ -39,7 +39,7 @@ jobs:
           npx remotion render VideoWithSubtitlesAndAudio \
             --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"subtitles\": $SUBTITLES, \"styleType\": \"$STYLE_TYPE\", \"duration\": $DURATION}" \
             --output="$OUTPUT_FILE.mp4"
-        
+         
 
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4
