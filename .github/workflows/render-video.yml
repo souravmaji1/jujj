@@ -23,21 +23,42 @@ jobs:
       - name: Install FFmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: Download Video from Supabase
+      - name: Download Video Clips from Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
         run: |
-          VIDEO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/${{ github.event.client_payload.videoPath }}"
-          echo "Downloading video from $VIDEO_URL"
-          curl -L -o input.mp4 "$VIDEO_URL" \
-            -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
-            --fail --silent --show-error
+          VIDEO_PATHS='${{ toJson(github.event.client_payload.videoPaths) }}'
+          echo "Video paths: $VIDEO_PATHS"
+          mkdir -p videos
+          INDEX=0
+          for VIDEO_PATH in $(echo $VIDEO_PATHS | jq -r '.[]'); do
+            VIDEO_URL="https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/$VIDEO_PATH"
+            echo "Downloading video $INDEX from $VIDEO_URL"
+            curl -L -o "videos/input_$INDEX.mp4" "$VIDEO_URL" \
+              -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZta2pkcmRpaWZlYnVjZnBrYnN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIyMTczMzcsImV4cCI6MjA1Nzc5MzMzN30.DpHqHHbpHnW981laR2u37syuQ8L_QEf6116vqsSMwGI" \
+              --fail --silent --show-error
+            if [ $? -ne 0 ]; then
+              echo "Error: Failed to download video $VIDEO_PATH from Supabase"
+              exit 1
+            fi
+            ls -l "videos/input_$INDEX.mp4"  # Verify the file exists
+            ((INDEX++))
+          done
+
+      - name: Combine Video Clips
+        run: |
+          echo "Combining video clips..."
+          ls videos/input_*.mp4 | while read -r file; do
+            echo "file '$file'" >> filelist.txt
+          done
+          cat filelist.txt
+          ffmpeg -f concat -safe 0 -i filelist.txt -an -c:v copy combined.mp4
           if [ $? -ne 0 ]; then
-            echo "Error: Failed to download video from Supabase"
+            echo "Error: Failed to combine videos with FFmpeg"
             exit 1
           fi
-          ls -l input.mp4  # Verify the file exists
+          ls -l combined.mp4  # Verify the combined file exists
 
       - name: Download Audio from Supabase
         if: ${{ github.event.client_payload.audioPath }}
@@ -58,18 +79,22 @@ jobs:
 
       - name: Render Video with Remotion
         env:
+          SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
+          STYLE_TYPE: ${{ github.event.client_payload.styleType }}
           OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
-          VIDEO_PATH: file://$(pwd)/input.mp4
-          AUDIO_PATH: ${{ github.event.client_payload.audioPath && format('file://{0}/input_audio.mp3', pwd()) || '' }}
+          VIDEO_PATH: file:///${{ github.workspace }}/combined.mp4
+          AUDIO_PATH: ${{ github.event.client_payload.audioPath && format('file:///{0}/input_audio.mp3', github.workspace) || '' }}
           DURATION: ${{ github.event.client_payload.duration }}
         run: |
           echo "Rendering video with props:"
+          echo "Subtitles: $SUBTITLES"
+          echo "Style Type: $STYLE_TYPE"
           echo "Video Path: $VIDEO_PATH"
           echo "Audio Path: $AUDIO_PATH"
           echo "Duration: $DURATION"
           echo "Output File: $OUTPUT_FILE"
           npx remotion render VideoWithSubtitlesAndAudio \
-            --props "{\"videoUrl\": \"$VIDEO_PATH\", \"audioUrl\": \"$AUDIO_PATH\", \"duration\": $DURATION}" \
+            --props "{\"videoUrl\": \"$VIDEO_PATH\", \"audioUrl\": \"$AUDIO_PATH\", \"subtitles\": $SUBTITLES, \"styleType\": \"$STYLE_TYPE\", \"duration\": $DURATION}" \
             --output="$OUTPUT_FILE.mp4"
           if [ $? -ne 0 ]; then
             echo "Error: Failed to render video with Remotion"
