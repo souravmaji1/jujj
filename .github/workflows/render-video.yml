@@ -22,25 +22,24 @@ jobs:
 
       - name: Render Video with Remotion
         env:
-          SUBTITLES: ${{ toJson(github.event.client_payload.subtitles) }}
-          STYLE_TYPE: ${{ github.event.client_payload.styleType }}
-          OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
           VIDEO_URLS: ${{ toJson(github.event.client_payload.videoUrls) }}
           AUDIO_URL: ${{ github.event.client_payload.audioUrl }}
           DURATION: ${{ github.event.client_payload.duration }}
+          TOTAL_DURATION_IN_FRAMES: ${{ github.event.client_payload.totalDurationInFrames }}
+          AUDIO_VOLUME: ${{ github.event.client_payload.audioVolume }}
+          OUTPUT_FILE: ${{ github.event.client_payload.outputFile }}
         run: |
           echo "Rendering video with props:"
-          echo "Subtitles: $SUBTITLES"
-          echo "Style Type: $STYLE_TYPE"
           echo "Video URLs: $VIDEO_URLS"
           echo "Audio URL: $AUDIO_URL"
           echo "Duration: $DURATION"
+          echo "Total Duration in Frames: $TOTAL_DURATION_IN_FRAMES"
+          echo "Audio Volume: $AUDIO_VOLUME"
           echo "Output File: $OUTPUT_FILE"
-          npx remotion render VideoWithSubtitlesAndAudio \
-            --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"subtitles\": $SUBTITLES, \"styleType\": \"$STYLE_TYPE\", \"duration\": $DURATION}" \
+          npx remotion render VideoWithAudio \
+            --props "{\"videoUrls\": $VIDEO_URLS, \"audioUrl\": \"$AUDIO_URL\", \"totalDurationInFrames\": $TOTAL_DURATION_IN_FRAMES, \"audioVolume\": $AUDIO_VOLUME}" \
             --output="$OUTPUT_FILE.mp4"
-         
-
+          
       - name: Upload Rendered Video as Artifact
         uses: actions/upload-artifact@v4
         with:
