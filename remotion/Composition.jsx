@@ -12,7 +12,11 @@ export const DURATION_IN_FRAMES = 300; // 10 seconds at 30 FPS
  * @param {number} props.audioVolume - Audio volume (0 to 1)
  * @param {number} props.totalDurationInFrames - Total duration in frames
  */
+
 export const VideoComposition = ({ clips, audioTrack, audioVolume, totalDurationInFrames }) => {
+
+
+
   let currentFrame = 0;
 
   return (
