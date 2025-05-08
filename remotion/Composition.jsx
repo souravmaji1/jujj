@@ -71,7 +71,7 @@ const VideoComposition = ({ clips, audioTrack, audioVolume, totalDurationInFrame
 export const RemotionComposition = () => {
   return (
     <Composition
-      id="VideoWithSubtitles"
+      id="VideoWithAudio"
       component={VideoComposition}
       durationInFrames={DURATION_IN_FRAMES} // Use constant or dynamic value
       fps={FPS}
