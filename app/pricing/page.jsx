@@ -1,781 +1,405 @@
 'use client'
 import { useState, useEffect, useRef } from 'react';
-import { 
-  Upload, Video, Scissors, Folder, CheckCircle, ChevronDown, ChevronRight, Home, Settings, Users, 
-  BarChart2, HelpCircle, Plus, ArrowRight, Sparkles, Clock, Zap, BookOpen, Music, Cloud, Download, Play
+import { useUser } from '@clerk/nextjs';
+import { createClient } from '@supabase/supabase-js';
+import {
+  Home,
+  Settings,
+  HelpCircle,
+  ChevronRight,
+  ChevronDown,
+  Video,
+  BookOpen,
+  Music,
+  Users,
+  Sparkles,
+  Zap,
+  Plus,
+  X,
+  Play,
+  User,
+  Briefcase,
+  Star,
+  Volume2,
+  FileMusic,
+  Calendar,
+  Link as LinkIcon,
+  Upload,
+  Film,
+  PlayCircle,
+  PauseCircle,
+  GripVertical
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import BulkUpload from '@/components/bulkupload';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 import { Player } from '@remotion/player';
-import { AbsoluteFill, useCurrentFrame, useVideoConfig, Video as RemotionVideo } from 'remotion';
-import { createClient } from '@supabase/supabase-js';
-import { motion } from 'framer-motion';
+import { Video as RemotionVideo, Audio, Sequence, AbsoluteFill } from 'remotion';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
+
 // Initialize Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_SECRET;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Subtitle Component for Remotion
-const SubtitleOverlay = ({ subtitles, styleType }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+// Remotion Video Composition Component
+const FPS = 30;
 
-  const activeSubtitle = subtitles.find(
-    subtitle => {
-      const startFrame = Math.floor(subtitle.start * fps);
-      const endFrame = Math.floor(subtitle.end * fps);
-      return frame >= startFrame && frame <= endFrame;
-    }
-  );
-
-  const styles = {
-    hormozi: {
-      position: 'absolute',
-      left: '10%',
-      right: '10%',
-      bottom: '10%',
-      textAlign: 'center',
-      fontFamily: 'Impact, Arial, sans-serif',
-      fontSize: '36px',
-      fontWeight: '900',
-      color: 'white',
-      textTransform: 'uppercase',
-      textShadow: '0 4px 6px rgba(0, 0, 0, 0.8)',
-      padding: '15px 20px',
-      backgroundColor: 'rgba(0, 0, 0, 0.9)',
-      borderRadius: '12px',
-      border: '4px solid #FFD700',
-      zIndex: 10,
-      opacity: activeSubtitle ? 1 : 0,
-      transition: 'opacity 0.2s ease-in-out'
-    },
-    abdaal: {
-      position: 'absolute',
-      left: '10%',
-      right: '10%',
-      bottom: '10%',
-      textAlign: 'center',
-      fontFamily: 'Helvetica, Arial, sans-serif',
-      fontSize: '28px',
-      fontWeight: '600',
-      color: '#F5F5F5',
-      textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
-      padding: '10px 15px',
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
-      borderRadius: '10px',
-      border: '2px solid #FFFFFF',
-      zIndex: 10,
-      opacity: activeSubtitle ? 1 : 0,
-      transition: 'opacity 0.2s ease-in-out'
-    },
-    neonGlow: {
-      position: 'absolute',
-      left: '10%',
-      right: '10%',
-      bottom: '10%',
-      textAlign: 'center',
-      fontFamily: '"Orbitron", Arial, sans-serif',
-      fontSize: '32px',
-      fontWeight: '700',
-      color: '#00FFDD',
-      textShadow: '0 0 8px #00FFDD, 0 0 16px #00FFDD, 0 0 24px #FF00FF',
-      padding: '12px 18px',
-      background: 'linear-gradient(45deg, rgba(255, 0, 255, 0.2), rgba(0, 255, 221, 0.2))',
-      borderRadius: '10px',
-      border: '2px solid #FF00FF',
-      zIndex: 10,
-      opacity: activeSubtitle ? 1 : 0,
-      transition: 'opacity 0.3s ease-in-out',
-      animation: activeSubtitle ? 'neonFlicker 1.5s infinite alternate' : 'none'
-    },
-    retroWave: {
-      position: 'absolute',
-      left: '10%',
-      right: '10%',
-      bottom: '10%',
-      textAlign: 'center',
-      fontFamily: '"VCR OSD Mono", monospace',
-      fontSize: '30px',
-      fontWeight: '400',
-      color: '#FF69B4',
-
-
-      textShadow: '0 0 10px #FF1493, 0 0 20px #9400D3',
-      padding: '10px 15px',
-      background: 'rgba(0, 0, 0, 0.7)',
-      borderRadius: '8px',
-      border: '3px double #00FFFF',
-      zIndex: 10,
-      opacity: activeSubtitle ? 1 : 0,
-      transition: 'opacity 0.2s ease-in-out',
-      filter: 'contrast(1.2)',
-      letterSpacing: '2px'
-    },
-    minimalPop: {
-      position: 'absolute',
-      left: '10%',
-      right: '10%',
-      bottom: '10%',
-      textAlign: 'center',
-      fontFamily: '"Poppins", Arial, sans-serif',
-      fontSize: '28px',
-      fontWeight: '500',
-      color: '#FFFFFF',
-      textShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-      padding: '8px 12px',
-      background: 'linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%)',
-      borderRadius: '12px',
-      border: 'none',
-      zIndex: 10,
-      opacity: activeSubtitle ? 1 : 0,
-      transition: 'opacity 0.3s ease-in-out, transform 0.2s ease-in-out',
-      transform: activeSubtitle ? 'scale(1)' : 'scale(0.95)'
-    },
-    none: {
-      position: 'absolute',
-      left: '10%',
-      right: '10%',
-      bottom: '10%',
-      textAlign: 'center',
-      fontFamily: 'Arial, sans-serif',
-      fontSize: '24px',
-      fontWeight: 'bold',
-      color: 'white',
-      textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)',
-      padding: '10px',
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      borderRadius: '8px',
-      zIndex: 10,
-      opacity: activeSubtitle ? 1 : 0,
-      transition: 'opacity 0.2s ease-in-out'
-    }
-  };
-
-  return <div style={styles[styleType] || styles.none}>{activeSubtitle ? activeSubtitle.text : ''}</div>;
-};
-
-// Remotion Video Component
-const VideoWithSubtitle = ({ videoUrl, subtitles, styleType }) => {
-  const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
+const VideoComposition = ({ clips, audioTrack, audioVolume, totalDurationInFrames }) => {
+  let currentFrame = 0;
 
   return (
-    <AbsoluteFill>
-      <RemotionVideo
-        src={videoUrl}
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        startFrom={0}
-        endAt={durationInFrames}
-        onError={(e) => console.error('Main video load error:', e)}
-      />
-      <SubtitleOverlay subtitles={subtitles} styleType={styleType} />
+    <AbsoluteFill style={{ backgroundColor: '#111827' }}>
+      {clips && clips.length > 0 ? (
+        clips.map((clip, index) => {
+          const startFrame = currentFrame;
+          const durationInSeconds = Math.max((clip.end - clip.start), 1 / FPS);
+          const durationInFrames = Math.round(durationInSeconds * FPS);
+          currentFrame += durationInFrames;
+
+          return (
+            <Sequence key={index} from={startFrame} durationInFrames={durationInFrames}>
+              <RemotionVideo
+                src={clip.src}
+                startFrom={Math.round(clip.start * FPS)}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => console.error(`Error loading video ${clip.src}:`, e)}
+              />
+            </Sequence>
+          );
+        })
+      ) : (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            backgroundColor: '#1a1a1a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#888',
+          }}
+        >
+          No clips selected
+        </div>
+      )}
+      {audioTrack && (
+        <Audio
+          src={audioTrack}
+          volume={audioVolume}
+          loop
+          onError={(e) => console.error(`Error loading audio ${audioTrack}:`, e)}
+        />
+      )}
     </AbsoluteFill>
   );
 };
 
-// Animation variants for the upload section
-const pulseAnimation = {
-  scale: [1, 1.03, 1],
-  transition: {
-    duration: 2,
-    repeat: Infinity,
-    repeatType: "reverse",
-  }
-};
-
-export default function VideoUploadPage() {
+export default function VideoCreatorPage() {
+  const { user } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedOption, setSelectedOption] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
+  const [selectedNav, setSelectedNav] = useState('video-creator');
+  const [campaigns, setCampaigns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
+  const [userRole, setUserRole] = useState('seller');
   const [isAnimating, setIsAnimating] = useState(false);
-  const [selectedNav, setSelectedNav] = useState('video-projects');
-  const [bulkUploadComplete, setBulkUploadComplete] = useState(false);
-  const [ffmpeg, setFFmpeg] = useState(null);
-  const [isLoadingFFmpeg, setIsLoadingFFmpeg] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [message, setMessage] = useState('');
-  const [uploadedVideo, setUploadedVideo] = useState(null);
-  const [videoInfo, setVideoInfo] = useState(null);
-  const [segmentVideos, setSegmentVideos] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const videoInputRef = useRef(null);
-  const [segmentSubtitles, setSegmentSubtitles] = useState([]);
-  const [subtitleStyles, setSubtitleStyles] = useState([]);
-  const [particleStyles, setParticleStyles] = useState([]);
-  const [isGeneratingSubtitles, setIsGeneratingSubtitles] = useState([]);
-  const [editingSegmentIndex, setEditingSegmentIndex] = useState(null);
-  const [newSubtitle, setNewSubtitle] = useState({ text: '', start: '', end: '' });
+  const [userChannelId, setUserChannelId] = useState(null);
+  const [influencers, setInfluencers] = useState({});
+  const [selectedClips, setSelectedClips] = useState([]);
+  const [backgroundAudio, setBackgroundAudio] = useState(null);
+  const [uploadedClips, setUploadedClips] = useState([]);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioVolume, setAudioVolume] = useState(0.5);
+  const [clipDurations, setClipDurations] = useState({});
+  const fileInputRef = useRef(null);
+  const playerRef = useRef(null);
+  const dragControls = useDragControls();
 
-  // Mock recent projects data
-  const recentProjects = [
-    { name: 'Summer Campaign', date: '2023-10-15', progress: 100 },
-    { name: 'Product Launch', date: '2023-10-10', progress: 75 },
-    { name: 'Event Recap', date: '2023-10-05', progress: 100 },
-  ];
+  // Calculate total duration based on selected clips
+  const totalDurationInSeconds = selectedClips.reduce((sum, clip) => {
+    const duration = clip.end - clip.start;
+    return sum + (isNaN(duration) ? 0 : duration);
+  }, 0);
+  const totalDurationInFrames = Math.max(Math.round(totalDurationInSeconds * FPS), 600);
 
-  // Initialize FFmpeg
+  // Fetch user's YouTube channel ID and campaigns
   useEffect(() => {
-    const loadFFmpeg = async () => {
-      try {
-        setIsLoadingFFmpeg(true);
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-        const ffmpegInstance = new FFmpeg();
-        
-        ffmpegInstance.on('progress', ({ progress }) => {
-          setProgress(progress * 100);
-        });
+    if (!user) return;
 
-        await ffmpegInstance.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
-        console.log('FFmpeg loaded');
-        setFFmpeg(ffmpegInstance);
-        setIsLoadingFFmpeg(false);
+    const fetchUserChannelAndCampaigns = async () => {
+      try {
+        setLoading(true);
+
+        const { data: influencerData, error: influencerError } = await supabase
+          .from('youtube_influencer')
+          .select('channel_id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (influencerError) throw new Error(`Failed to fetch influencer data: ${influencerError.message}`);
+
+        const channelId = influencerData?.channel_id;
+        setUserChannelId(channelId);
+
+        if (!channelId) {
+          setError('No YouTube channel associated with this account');
+          setCampaigns([]);
+          return;
+        }
+
+        const { data: campaignData, error: campaignError } = await supabase
+          .from('campaigns')
+          .select(`
+            *,
+            campaign_media (
+              id,
+              file_url,
+              file_type
+            )
+          `)
+          .contains('selected_influencers', [channelId]);
+
+        if (campaignError) throw new Error(`Failed to fetch campaigns: ${campaignError.message}`);
+
+        const influencerIds = campaignData.flatMap(c => c.selected_influencers);
+        if (influencerIds.length > 0) {
+          const { data: influencerData, error: influencerFetchError } = await supabase
+            .from('youtube_influencer')
+            .select('channel_id, channel_title, custom_url, subscriber_count, view_count, thumbnail_url')
+            .in('channel_id', [...new Set(influencerIds)]);
+
+          if (influencerFetchError) throw new Error(`Failed to fetch influencers: ${influencerFetchError.message}`);
+
+          const influencerMap = influencerData.reduce((acc, influencer) => ({
+            ...acc,
+            [influencer.channel_id]: influencer
+          }), {});
+          setInfluencers(influencerMap);
+        }
+
+        setCampaigns(campaignData || []);
       } catch (error) {
-        console.error('Error loading FFmpeg:', error);
-        setMessage('Failed to load FFmpeg');
-        setIsLoadingFFmpeg(false);
+        console.error('Error fetching data:', error);
+        setError(error.message || 'Failed to load campaigns');
+      } finally {
+        setLoading(false);
       }
     };
 
-    if (selectedOption === 'single' && !ffmpeg) {
-      loadFFmpeg();
-    }
-  }, [selectedOption]);
+    fetchUserChannelAndCampaigns();
+  }, [user]);
 
-  // Animation effect on mount
   useEffect(() => {
     setIsAnimating(true);
     const timer = setTimeout(() => setIsAnimating(false), 1000);
     return () => clearTimeout(timer);
   }, []);
 
-  // Initialize subtitles, subtitle styles, and subtitle generation status arrays when segments are created
-  useEffect(() => {
-    if (segmentVideos.length > 0) {
-      setSegmentSubtitles(segmentVideos.map(() => []));
-      setSubtitleStyles(segmentVideos.map(() => 'none'));
-      setIsGeneratingSubtitles(segmentVideos.map(() => false));
-    } else {
-      setSegmentSubtitles([]);
-      setSubtitleStyles([]);
-      setIsGeneratingSubtitles([]);
+  // Function to fetch clip duration
+  const fetchClipDuration = async (clip) => {
+    try {
+      const video = document.createElement('video');
+      video.src = clip.file_url;
+      const duration = await new Promise((resolve, reject) => {
+        video.onloadedmetadata = () => resolve(video.duration);
+        video.onerror = () => reject(new Error(`Failed to load metadata for ${clip.file_url}`));
+      });
+      return duration;
+    } catch (err) {
+      console.error(err);
+      return 10; // Fallback duration
     }
-  }, [segmentVideos]);
-
-  // Generate particle styles
-  useEffect(() => {
-    const styles = [...Array(20)].map(() => ({
-      top: `${Math.random() * 100}%`,
-      left: `${Math.random() * 100}%`,
-      animationDelay: `${Math.random() * 5}s`,
-      animation: 'float 15s infinite ease-in-out'
-    }));
-    setParticleStyles(styles);
-  }, []);
+  };
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
-  const handleDragEnter = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(true);
+  const openCampaignDetails = (campaign) => {
+    setSelectedCampaign(campaign);
+    setSelectedClips([]);
+    setBackgroundAudio(null);
+    setUploadedClips([]);
+    setIsPlaying(false);
+    setClipDurations({});
   };
 
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
+  const closeCampaignDetails = () => {
+    setSelectedCampaign(null);
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleVideoUpload({ target: { files: e.dataTransfer.files } });
+  const handleClipSelect = async (media) => {
+    if (selectedClips.some((clip) => clip.id === media.id)) {
+      setSelectedClips(selectedClips.filter((clip) => clip.id !== media.id));
+    } else {
+      const duration = await fetchClipDuration(media);
+      setClipDurations(prev => ({ ...prev, [media.id]: duration }));
+      setSelectedClips([
+        ...selectedClips,
+        { ...media, start: 0, end: duration }
+      ]);
     }
   };
 
-  const handleVideoUpload = async (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      
-      if (!file.type.startsWith('video/')) {
-        setMessage('Please upload a valid video file.');
-        return;
-      }
-      
-      setMessage('Analyzing video...');
-      
-      try {
-        const videoEl = document.createElement('video');
-        videoEl.preload = 'metadata';
-        
-        const metadataLoaded = new Promise((resolve) => {
-          videoEl.onloadedmetadata = () => resolve(videoEl);
-        });
-        
-        videoEl.src = URL.createObjectURL(file);
-        
-        const loadedVideo = await metadataLoaded;
-        
-        const info = {
-          name: file.name,
-          duration: loadedVideo.duration,
-          width: loadedVideo.videoWidth,
-          height: loadedVideo.videoHeight
-        };
-        
-        setUploadedVideo(file);
-        setVideoInfo(info);
-        
-        setSegmentVideos([]);
-        setSegmentSubtitles([]);
-        setSubtitleStyles([]);
-        
-        if (selectedOption === 'single') {
-          if (info.duration > 30) {
-            await splitVideo(info);
-          } else {
-            setMessage(`Video is ${info.duration.toFixed(1)} seconds long. Processing as a single segment.`);
-            await splitVideo(info);
-          }
-        } else {
-          setMessage(`Video "${file.name}" is ready for processing.`);
-        }
-        
-        URL.revokeObjectURL(loadedVideo.src);
-      } catch (error) {
-        console.error(`Error analyzing video ${file.name}:`, error);
-        setMessage('Error analyzing video');
-      }
-    }
+  const handleAudioSelect = (media) => {
+    setBackgroundAudio(backgroundAudio?.id === media.id ? null : media);
   };
 
-  const splitVideo = async (videoInfo) => {
-    if (!ffmpeg || !uploadedVideo || !videoInfo) return;
-
-    setIsProcessing(true);
-    setMessage('Processing video...');
-    setSegmentVideos([]);
+  const handleFileUpload = async (event) => {
+    const files = event.target.files;
+    if (!files) return;
 
     try {
-      const segmentDuration = 30;
-      const maxSegments = Math.min(1, Math.ceil(videoInfo.duration / segmentDuration));
-      setMessage(`Splitting into ${maxSegments} segment(s) of up to 30 seconds each for Instagram Reels...`);
-      
-      const videoData = await fetchFile(uploadedVideo);
-      await ffmpeg.writeFile('input.mp4', videoData);
-      
-      const newSegments = [];
-      
-      for (let i = 0; i < maxSegments; i++) {
-        const startTime = i * segmentDuration;
-        const remainingDuration = Math.min(segmentDuration, videoInfo.duration - startTime);
-        if (remainingDuration <= 0) break;
-        
-        setMessage(`Creating segment ${i+1} of ${maxSegments}...`);
-        
-        await ffmpeg.exec([
-          '-i', 'input.mp4',
-          '-ss', startTime.toString(),
-          '-t', remainingDuration.toString(),
-          '-vf', 'scale=-1:1080, crop=607:1080',
-          '-c:v', 'libx264',
-          '-c:a', 'aac',
-          '-pix_fmt', 'yuv420p',
-          '-movflags', '+faststart',
-          '-preset', 'fast',
-          '-f', 'mp4',
-          `segment_${i}.mp4`
-        ]);
-        
-        const data = await ffmpeg.readFile(`segment_${i}.mp4`);
-        const blob = new Blob([data.buffer], { type: 'video/mp4' });
-        
-        const videoEl = document.createElement('video');
-        videoEl.src = URL.createObjectURL(blob);
-        const canPlay = await new Promise(resolve => {
-          videoEl.oncanplay = () => resolve(true);
-          videoEl.onerror = () => resolve(false);
-          videoEl.load();
-        });
-        
-        if (!canPlay) {
-          throw new Error(`Segment ${i+1} is not a valid video`);
-        }
-        
-        const url = URL.createObjectURL(blob);
-        newSegments.push({
-          url,
-          startTime,
-          duration: remainingDuration,
-          index: i
-        });
-      }
-      
-      setSegmentVideos(newSegments);
-      setMessage(`Video successfully split into ${newSegments.length} Instagram Reels segments.`);
-    } catch (error) {
-      console.error('Error splitting video:', error);
-      setMessage('Error splitting video: ' + error.message);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+      const uploaded = [];
+      const newDurations = { ...clipDurations };
+      for (const file of files) {
+        if (file.type.startsWith('video/')) {
+          const { data, error } = await supabase.storage
+            .from('avatars')
+            .upload(`${user.id}/${Date.now()}_${file.name}`, file);
 
-  const generateSubtitles = async (segmentIndex) => {
-    const segment = segmentVideos[segmentIndex];
-    if (!segment) return;
+          if (error) throw error;
 
-    setIsGeneratingSubtitles(prev => {
-      const newState = [...prev];
-      newState[segmentIndex] = true;
-      return newState;
-    });
-    setMessage(`Generating subtitles for segment ${segmentIndex + 1}...`);
+          const { data: publicUrlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(data.path);
 
-    try {
-      const fileName = `segment_${segment.index}_${Date.now()}.mp4`;
-      const blob = await fetch(segment.url).then(res => res.blob());
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(`input/${fileName}`, blob, {
-          contentType: 'video/mp4'
-        });
-
-      if (uploadError) {
-        console.error(`Supabase upload error for segment ${segmentIndex + 1}:`, uploadError);
-        setMessage(`Failed to upload segment ${segmentIndex + 1}: ${uploadError.message}`);
-        setSegmentSubtitles(prev => {
-          const newSubtitles = [...prev];
-          newSubtitles[segmentIndex] = [{ text: 'Upload failed', start: 0, end: segment.duration }];
-          return newSubtitles;
-        });
-        return;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(`input/${fileName}`);
-      
-      const publicUrl = urlData.publicUrl;
-
-      let transcription = null;
-      let attempts = 0;
-      const maxAttempts = 3;
-
-      while (attempts < maxAttempts && !transcription) {
-        try {
-          attempts++;
-          const response = await fetch('/api/transcribe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ videoUrl: publicUrl, segmentStart: segment.startTime })
+          const video = document.createElement('video');
+          video.src = URL.createObjectURL(file);
+          const duration = await new Promise((resolve, reject) => {
+            video.onloadedmetadata = () => resolve(video.duration);
+            video.onerror = () => reject(new Error(`Failed to load metadata for ${file.name}`));
           });
 
-          if (!response.ok) {
-            const errorData = await response.json();
-            if (attempts === maxAttempts) {
-              setMessage(`Failed to transcribe segment ${segmentIndex + 1} after ${maxAttempts} attempts`);
-              setSegmentSubtitles(prev => {
-                const newSubtitles = [...prev];
-                newSubtitles[segmentIndex] = [{ text: 'Transcription failed', start: 0, end: segment.duration }];
-                return newSubtitles;
-              });
-              break;
-            }
-            continue;
-          }
-
-          transcription = await response.json();
-        } catch (error) {
-          if (attempts === maxAttempts) {
-            setMessage(`Error transcribing segment ${segmentIndex + 1}: ${error.message}`);
-            setSegmentSubtitles(prev => {
-              const newSubtitles = [...prev];
-              newSubtitles[segmentIndex] = [{ text: 'Error generating subtitles', start: 0, end: segment.duration }];
-              return newSubtitles;
-            });
-          }
-          continue;
+          const clip = {
+            id: `uploaded_${Date.now()}_${file.name}`,
+            file_url: publicUrlData.publicUrl,
+            file_type: 'video',
+            name: file.name,
+            start: 0,
+            end: duration
+          };
+          uploaded.push(clip);
+          newDurations[clip.id] = duration;
         }
       }
-
-      if (transcription) {
-        let subtitles = [];
-        const utterances = transcription?.results?.channels?.[0]?.utterances;
-        const paragraphs = transcription?.results?.channels?.[0]?.alternatives?.[0]?.paragraphs?.paragraphs;
-
-        if (utterances && Array.isArray(utterances)) {
-          subtitles = utterances.map(utterance => ({
-            text: utterance.transcript,
-            start: utterance.start - segment.startTime,
-            end: utterance.end - segment.startTime
-          })).filter(sub => sub.start >= 0 && sub.end <= segment.duration);
-        } else if (paragraphs && Array.isArray(paragraphs)) {
-          subtitles = paragraphs.flatMap(paragraph =>
-            paragraph.sentences.map(sentence => ({
-              text: sentence.text,
-              start: sentence.start - segment.startTime,
-              end: sentence.end - segment.startTime
-            }))
-          ).filter(sub => sub.start >= 0 && sub.end <= segment.duration);
-        }
-
-        if (subtitles.length === 0) {
-          subtitles = [{ text: 'No audio detected', start: 0, end: segment.duration }];
-        }
-
-        setSegmentSubtitles(prev => {
-          const newSubtitles = [...prev];
-          newSubtitles[segmentIndex] = subtitles;
-          return newSubtitles;
-        });
-        setMessage(`Subtitles generated for segment ${segmentIndex + 1}.`);
-      }
-
-      const { error: deleteError } = await supabase.storage
-        .from('avatars')
-        .remove([`input/${fileName}`]);
-
-      if (deleteError) {
-        console.warn(`Failed to delete segment ${fileName} from Supabase:`, deleteError);
-      }
+      setUploadedClips([...uploadedClips, ...uploaded]);
+      setClipDurations(newDurations);
     } catch (error) {
-      console.error(`Error processing segment ${segmentIndex + 1}:`, error);
-      setMessage(`Error processing segment ${segmentIndex + 1}: ${error.message}`);
-      setSegmentSubtitles(prev => {
-        const newSubtitles = [...prev];
-        newSubtitles[segmentIndex] = [{ text: 'Error generating subtitles', start: 0, end: segment.duration }];
-        return newSubtitles;
-      });
-    } finally {
-      setIsGeneratingSubtitles(prev => {
-        const newState = [...prev];
-        newState[segmentIndex] = false;
-        return newState;
-      });
+      console.error('Error uploading files:', error);
+      setError('Failed to upload clips');
     }
   };
 
-  const downloadSegmentWithRemotion = async (index) => {
-    if (!segmentVideos[index]) return;
-
-    setMessage(`Preparing to render segment ${index + 1} with subtitles...`);
-    setIsProcessing(true);
-
-    try {
-      const segment = segmentVideos[index];
-      const subtitles = segmentSubtitles[index] || [];
-      const subtitleStyle = subtitleStyles[index] ?? 'none';
-
-      const fileName = `segment_${index}_${Date.now()}.mp4`;
-      const mainBlob = await fetch(segment.url).then(res => res.blob());
-      const { data: mainUploadData, error: mainUploadError } = await supabase.storage
-        .from('avatars')
-        .upload(`input/${fileName}`, mainBlob, {
-          contentType: 'video/mp4'
-        });
-
-      if (mainUploadError) {
-        throw new Error(`Failed to upload main video to Supabase: ${mainUploadError.message}`);
+  const handleUploadedClipSelect = async (clip) => {
+    if (selectedClips.some((c) => c.id === clip.id)) {
+      setSelectedClips(selectedClips.filter((c) => c.id !== clip.id));
+    } else {
+      const duration = clipDurations[clip.id] || await fetchClipDuration(clip);
+      if (!clipDurations[clip.id]) {
+        setClipDurations(prev => ({ ...prev, [clip.id]: duration }));
       }
-
-      const { data: mainUrlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(`input/${fileName}`);
-      
-      const mainPublicUrl = mainUrlData.publicUrl;
-      const mainVideoPath = `input/${fileName}`;
-
-      const response = await fetch('/api/render', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          videoPath: mainVideoPath,
-          subtitles,
-          styleType: subtitleStyle,
-          subtitlePosition: 'bottom',
-          duration: segment.duration,
-          segmentIndex: index
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to process video rendering');
-      }
-
-      const blob = await response.blob();
-      const downloadUrl = URL.createObjectURL(blob);
-
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = `reel_with_subtitle_${index + 1}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-
-      URL.revokeObjectURL(downloadUrl);
-      setMessage(`Segment ${index + 1} rendered and downloaded successfully.`);
-
-      const { error: deleteError } = await supabase.storage
-        .from('avatars')
-        .remove([mainVideoPath]);
-
-      if (deleteError) {
-        console.warn(`Failed to delete file from Supabase:`, deleteError);
-      }
-    } catch (error) {
-      console.error('Error in downloadSegmentWithRemotion:', error);
-      setMessage(`Error rendering video: ${error.message}`);
-      const a = document.createElement('a');
-      a.href = segmentVideos[index].url;
-      a.download = `reel_segment_${index + 1}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } finally {
-      setIsProcessing(false);
+      setSelectedClips([
+        ...selectedClips,
+        { ...clip, start: 0, end: duration }
+      ]);
     }
   };
 
-  const handleSubtitleStyleChange = (index, style) => {
-    setSubtitleStyles(prev => {
-      const newStyles = [...prev];
-      newStyles[index] = style;
-      return newStyles;
-    });
+  const reorderClips = (fromIndex, toIndex) => {
+    const newClips = [...selectedClips];
+    const [movedClip] = newClips.splice(fromIndex, 1);
+    newClips.splice(toIndex, 0, movedClip);
+    setSelectedClips(newClips);
   };
 
-  const handleAddSubtitle = (segmentIndex) => {
-    const segment = segmentVideos[segmentIndex];
-    if (!segment) return;
+  const updateClipTiming = (clipId, field, value) => {
+    setSelectedClips(clips =>
+      clips.map((clip) => {
+        if (clip.id !== clipId) return clip;
 
-    const start = parseFloat(newSubtitle.start);
-    const end = parseFloat(newSubtitle.end);
+        const maxDuration = clipDurations[clipId] || 10;
+        let newStart = clip.start || 0;
+        let newEnd = clip.end || maxDuration;
+        const newValue = Math.max(0, parseFloat(value) || 0);
 
-    if (!newSubtitle.text || isNaN(start) || isNaN(end) || start < 0 || end > segment.duration || start >= end) {
-      setMessage('Please enter valid subtitle text and timing.');
-      return;
-    }
+        if (field === 'start') {
+          newStart = Math.min(newValue, maxDuration - 0.1);
+          newEnd = Math.max(newStart + 0.1, Math.min(newEnd, maxDuration));
+        } else if (field === 'end') {
+          newEnd = Math.min(newValue, maxDuration);
+          newStart = Math.min(newStart, newEnd - 0.1);
+        }
 
-    const newSub = { text: newSubtitle.text, start, end };
-    setSegmentSubtitles(prev => {
-      const newSubtitles = [...prev];
-      newSubtitles[segmentIndex] = [...(newSubtitles[segmentIndex] || []), newSub].sort((a, b) => a.start - b.start);
-      return newSubtitles;
-    });
-
-    setNewSubtitle({ text: '', start: '', end: '' });
-    setMessage(`Subtitle added to segment ${segmentIndex + 1}.`);
-  };
-
-  const handleEditSubtitle = (segmentIndex, subtitleIndex, updatedSubtitle) => {
-    const segment = segmentVideos[segmentIndex];
-    if (!segment) return;
-
-    const start = parseFloat(updatedSubtitle.start);
-    const end = parseFloat(updatedSubtitle.end);
-
-    if (!updatedSubtitle.text || isNaN(start) || isNaN(end) || start < 0 || end > segment.duration || start >= end) {
-      setMessage('Please enter valid subtitle text and timing.');
-      return;
-    }
-
-    setSegmentSubtitles(prev => {
-      const newSubtitles = [...prev];
-      newSubtitles[segmentIndex] = [
-        ...newSubtitles[segmentIndex].slice(0, subtitleIndex),
-        { text: updatedSubtitle.text, start, end },
-        ...newSubtitles[segmentIndex].slice(subtitleIndex + 1)
-      ].sort((a, b) => a.start - b.start);
-      return newSubtitles;
-    });
-
-    setMessage(`Subtitle updated in segment ${segmentIndex + 1}.`);
-  };
-
-  const handleDeleteSubtitle = (segmentIndex, subtitleIndex) => {
-    setSegmentSubtitles(prev => {
-      const newSubtitles = [...prev];
-      newSubtitles[segmentIndex] = [
-        ...newSubtitles[segmentIndex].slice(0, subtitleIndex),
-        ...newSubtitles[segmentIndex].slice(subtitleIndex + 1)
-      ];
-      return newSubtitles;
-    });
-    setMessage(`Subtitle deleted from segment ${segmentIndex + 1}.`);
-  };
-
-  const triggerVideoInput = () => {
-    videoInputRef.current?.click();
-  };
-
-  const Particles = () => {
-    return (
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {particleStyles.map((style, i) => (
-          <div 
-            key={i}
-            className="absolute w-2 h-2 rounded-full bg-purple-500 opacity-20"
-            style={style}
-          />
-        ))}
-      </div>
+        return { ...clip, start: newStart, end: newEnd };
+      })
     );
   };
 
-  const NavItem = ({ icon, label, active, onClick }) => {
+  const togglePlay = () => {
+    if (playerRef.current) {
+      try {
+        if (isPlaying) {
+          playerRef.current.pause();
+        } else {
+          playerRef.current.play();
+        }
+        setIsPlaying(!isPlaying);
+      } catch (err) {
+        console.error('Error controlling player:', err);
+        setError('Failed to control video playback');
+      }
+    } else {
+      console.warn('Player ref is not initialized');
+      setError('Video player is not ready');
+    }
+  };
+
+  const NavItem = ({ icon, label, active, onClick, href }) => {
     return (
       <li>
-        <button 
-          onClick={onClick}
-          className={`w-full flex items-center py-3 px-4 rounded-xl transition-all duration-300 group
-          ${active 
-            ? 'bg-gradient-to-r from-purple-900/60 to-blue-900/40 text-white shadow-md shadow-purple-900/20' 
-            : 'text-gray-300 hover:bg-gray-800/50 hover:text-white hover:shadow-sm hover:shadow-purple-900/10'}`}
-        >
-          <div className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300
+        <Link href={href} passHref>
+          <button 
+            onClick={onClick}
+            className={`w-full flex items-center py-3 px-4 rounded-xl transition-all duration-300 group
             ${active 
-              ? 'bg-gradient-to-br from-purple-500/30 to-blue-500/30 text-purple-300' 
-              : 'text-gray-400 group-hover:text-purple-300'}`}>
-            {icon}
-          </div>
-          {sidebarOpen && (
-            <div className="ml-3 flex-1 flex flex-col items-start overflow-hidden">
-              <span className={`font-medium transition-all ${active ? 'text-white' : ''}`}>{label}</span>
-              {active && <div className="w-8 h-0.5 bg-gradient-to-r from-purple-400 to-blue-400 mt-1 rounded-full"></div>}
+              ? 'bg-gradient-to-r from-purple-900/60 to-blue-900/40 text-white shadow-md shadow-purple-900/20' 
+              : 'text-gray-300 hover:bg-gray-800/50 hover:text-white hover:shadow-sm hover:shadow-purple-900/10'}`}
+          >
+            <div className={`flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300
+              ${active 
+                ? 'bg-gradient-to-br from-purple-500/30 to-blue-500/30 text-purple-300' 
+                : 'text-gray-400 group-hover:text-purple-300'}`}>
+              {icon}
             </div>
-          )}
-          {active && sidebarOpen && (
-            <div className="w-1.5 h-8 bg-gradient-to-b from-purple-400 to-blue-400 rounded-full mr-1"></div>
-          )}
-        </button>
+            {sidebarOpen && (
+              <div className="ml-3 flex-1 flex flex-col items-start overflow-hidden">
+                <span className={`font-medium transition-all ${active ? 'text-white' : ''}`}>{label}</span>
+                {active && <div className="w-8 h-0.5 bg-gradient-to-r from-purple-400 to-blue-400 mt-1 rounded-full"></div>}
+              </div>
+            )}
+            {active && sidebarOpen && (
+              <div className="w-1.5 h-8 bg-gradient-to-b from-purple-400 to-blue-400 rounded-full mr-1"></div>
+            )}
+          </button>
+        </Link>
       </li>
     );
   };
 
   return (
     <div className="flex h-screen bg-gray-950 text-white overflow-hidden relative">
+      {/* Animated background gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 opacity-50">
         <div className="absolute top-0 left-0 w-full h-full">
           <div className="absolute top-1/4 left-1/4 w-1/2 h-1/2 bg-purple-900/10 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '15s' }}></div>
           <div className="absolute bottom-1/3 right-1/3 w-1/2 h-1/2 bg-blue-900/10 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '20s' }}></div>
         </div>
       </div>
-      
-      <Particles />
 
+      {/* Sidebar */}
       <div className={`${sidebarOpen ? 'w-72' : 'w-24'} bg-gray-900/90 backdrop-blur-md border-r border-gray-800/50 transition-all duration-300 flex flex-col z-10`}>
         <div className="py-6 border-b border-gray-800/50 transition-all">
           <div className={`px-6 flex items-center ${sidebarOpen ? 'justify-between' : 'justify-center'}`}>
@@ -783,7 +407,7 @@ export default function VideoUploadPage() {
               <div className="flex items-center">
                 <div className="relative w-12 h-12 mr-4 overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl shadow-lg shadow-purple-900/30 flex items-center justify-center">
-                    <Video size={24} class implique="text-white z-10" />
+                    <Video size={24} className="text-white z-10" />
                     <div className="absolute w-12 h-12 bg-white/20 rounded-full blur-lg animate-pulse"></div>
                     <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-blue-500/40"></div>
                   </div>
@@ -804,598 +428,807 @@ export default function VideoUploadPage() {
             )}
             <button 
               onClick={toggleSidebar}
-              className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800/50 transition-all"
+              className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800/50 transition-all z-50 relative"
             >
               {sidebarOpen ? <ChevronRight size={20} /> : <ChevronDown size={20} />}
             </button>
           </div>
         </div>
-        
+
         <ScrollArea className="flex-1 py-6 px-4">
-          <div className={`mb-8 transition-all duration-500 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
+          <div className="mb-8">
+            {sidebarOpen && (
+              <div className="px-4 mb-4">
+                <div className="flex space-x-2 mb-4">
+                  <Button
+                    onClick={() => setUserRole('buyer')}
+                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all
+                      ${userRole === 'buyer'
+                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md'
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    <User size={16} className="mr-2" />
+                    Buyer
+                  </Button>
+                  <Button
+                    onClick={() => setUserRole('seller')}
+                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all
+                      ${userRole === 'seller'
+                        ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md'
+                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+                  >
+                    <Briefcase size={16} className="mr-2" />
+                    Seller
+                  </Button>
+                </div>
+              </div>
+            )}
             {sidebarOpen && (
               <div className="flex items-center justify-between px-4 mb-4">
-                <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Main Menu</h3>
+                <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">{userRole === 'buyer' ? 'Main Menu' : 'Seller Dashboard'}</h3>
                 <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
               </div>
             )}
             <ul className="space-y-2">
-              <NavItem 
-                icon={<Home size={20} />} 
-                label="Dashboard" 
-                active={selectedNav === 'dashboard'}
-                onClick={() => setSelectedNav('dashboard')} 
-              />
-              <NavItem 
-                icon={<Video size={20} />} 
-                label="Video Projects" 
-                active={selectedNav === 'video-projects'} 
-                onClick={() => setSelectedNav('video-projects')}
-              />
-              <NavItem 
-                icon={<BookOpen size={20} />} 
-                label="Templates" 
-                active={selectedNav === 'templates'} 
-                onClick={() => setSelectedNav('templates')}
-              />
-              <NavItem 
-                icon={<Music size={20} />} 
-                label="Audio Library" 
-                active={selectedNav === 'audio'} 
-                onClick={() => setSelectedNav('audio')}
-              />
+              {userRole === 'buyer' ? (
+                <>
+                  <NavItem 
+                    icon={<Home size={20} />} 
+                    label="Dashboard" 
+                    active={selectedNav === 'dashboard'}
+                    onClick={() => setSelectedNav('dashboard')}
+                    href="/dashboard"
+                  />
+                  <NavItem 
+                    icon={<Video size={20} />} 
+                    label="Create Campaign" 
+                    active={selectedNav === 'create'} 
+                    onClick={() => setSelectedNav('create')}
+                    href="/create"
+                  />
+                  <NavItem 
+                    icon={<BookOpen size={20} />} 
+                    label="Video Library" 
+                    active={selectedNav === 'library'} 
+                    onClick={() => setSelectedNav('library')}
+                    href="/videolibrary"
+                  />
+                  <NavItem 
+                    icon={<Music size={20} />} 
+                    label="Your Stats" 
+                    active={selectedNav === 'stats'} 
+                    onClick={() => setSelectedNav('stats')}
+                    href="/stats"
+                  />
+                </>
+              ) : (
+                <>
+                  <NavItem 
+                    icon={<User size={20} />} 
+                    label="Profile Settings" 
+                    active={selectedNav === 'profile'}
+                    onClick={() => setSelectedNav('profile')}
+                    href="/profile"
+                  />
+                  <NavItem 
+                    icon={<Video size={20} />} 
+                    label="Manage Campaign" 
+                    active={selectedNav === 'campaigns'} 
+                    onClick={() => setSelectedNav('campaigns')}
+                    href="/campaigns"
+                  />
+                  <NavItem 
+                    icon={<Film size={20} />} 
+                    label="Video Creator" 
+                    active={selectedNav === 'video-creator'} 
+                    onClick={() => setSelectedNav('video-creator')}
+                    href="/video-creator"
+                  />
+                  <NavItem 
+                    icon={<Sparkles size={20} />} 
+                    label="AI Post Generate" 
+                    active={selectedNav === 'ai-generate'} 
+                    onClick={() => setSelectedNav('ai-generate')}
+                    href="/ai-post-generate"
+                  />
+                  <NavItem 
+                    icon={<Settings size={20} />} 
+                    label="Settings" 
+                    active={selectedNav === 'settings'} 
+                    onClick={() => setSelectedNav('settings')}
+                    href="/settings"
+                  />
+                </>
+              )}
             </ul>
           </div>
 
-          <div className={`mb-8 transition-all duration-500 delay-100 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
-            {sidebarOpen && (
-              <div className="flex items-center justify-between px-4 mb-4">
-                <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Workspace</h3>
-                <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
+          {userRole === 'buyer' && (
+            <div className={`mb-8 transition-all duration-500 delay-100 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
+              {sidebarOpen && (
+                <div className="flex items-center justify-between px-4 mb-4">
+                  <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Workspace</h3>
+                  <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
+                </div>
+              )}
+              <ul className="space-y-2">
+                <NavItem 
+                  icon={<Users size={20} />} 
+                  label="Pricing" 
+                  active={selectedNav === 'pricing'} 
+                  onClick={() => setSelectedNav('pricing')}
+                  href="/pricing"
+                />
+                <NavItem 
+                  icon={<Settings size={20} />} 
+                  label="Settings" 
+                    active={selectedNav === 'settings'} 
+                    onClick={() => setSelectedNav('settings')}
+                    href="/settings"
+                  />
+                </ul>
               </div>
             )}
-            <ul className="space-y-2">
-              <NavItem 
-                icon={<Users size={20} />} 
-                label="Team Members" 
-                active={selectedNav === 'team'} 
-                onClick={() => setSelectedNav('team')}
-              />
-              <NavItem 
-                icon={<BarChart2 size={20} />} 
-                label="Analytics" 
-                active={selectedNav === 'analytics'} 
-                onClick={() => setSelectedNav('analytics')}
-              />
-              <NavItem 
-                icon={<Cloud size={20} />} 
-                label="Cloud Storage" 
-                active={selectedNav === 'cloud'} 
-                onClick={() => setSelectedNav('cloud')}
-              />
-              <NavItem 
-                icon={<Settings size={20} />} 
-                label="Settings" 
-                active={selectedNav === 'settings'} 
-                onClick={() => setSelectedNav('settings')}
-              />
-            </ul>
-          </div>
 
-          {sidebarOpen && (
-            <div className={`mt-8 transition-all duration-500 delay-200 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
-              <div className="relative overflow-hidden rounded-2xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40"></div>
-                <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-purple-500/20 rounded-full blur-xl"></div>
-                <div className="absolute -top-6 -left-6 w-24 h-24 bg-blue-500/20 rounded-full blur-xl"></div>
-                
-                <div className="relative p-6 backdrop-blur-sm border border-purple-500/20 rounded-2xl">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <div className="p-3 bg-gradient-to-br from-purple-500/30 to-blue-500/30 rounded-xl border border-purple-500/20 shadow-inner shadow-purple-500/10">
-                      <Sparkles size={20} className="text-purple-300" />
+            {sidebarOpen && (
+              <div className={`mt-8 transition-all duration-500 delay-200 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
+                <div className="relative overflow-hidden rounded-2xl">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40 z-0 pointer-events-none"></div>
+                  <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-purple-500/20 rounded-full blur-xl z-0 pointer-events-none"></div>
+                  <div className="absolute -top-6 -left-6 w-24 h-24 bg-blue-500/20 rounded-full blur-xl z-0 pointer-events-none"></div>
+                  
+                  <div className="relative p-6 backdrop-blur-sm border border-purple-500/20 rounded-2xl z-10">
+                    <div className="flex items-center space-x-3 mb-4">
+                      <div className="p-3 bg-gradient-to-br from-purple-500/30 to-blue-500/30 rounded-xl border border-purple-500/20 shadow-inner shadow-purple-500/10">
+                        <Sparkles size={20} className="text-purple-300" />
+                      </div>
+                      <h4 className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">Pro Features</h4>
                     </div>
-                    <h4 className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">Pro Features</h4>
+                    <p className="text-sm text-gray-300 mb-4 leading-relaxed">
+                      Unlock AI video enhancements, unlimited storage, and team collaboration.
+                    </p>
+                    <div className="w-full h-1.5 bg-gray-800/60 rounded-full mb-2 overflow-hidden">
+                      <div className="h-full w-3/4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"></div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-gray-400 mb-4">
+                      <span>75% complete</span>
+                      <span>7 days left</span>
+                    </div>
+                    <button className="w-full py-3 text-sm font-medium rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 flex items-center justify-center group z-50 relative">
+                      <Zap size={16} className="mr-2 group-hover:animate-pulse" />
+                      Upgrade Now
+                    </button>
                   </div>
-                  <p className="text-sm text-gray-300 mb-4 leading-relaxed">
-                    Unlock AI video enhancements, unlimited storage, and team collaboration.
-                  </p>
-                  <div className="w-full h-1.5 bg-gray-800/60 rounded-full mb-2 overflow-hidden">
-                    <div className="h-full w-3/4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"></div>
+                </div>
+              </div>
+            )}
+          </ScrollArea>
+
+          <div className="p-4 border-t border-gray-800/50">
+            <Link href="/create" passHref>
+              <button className="w-full flex items-center justify-center py-4 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 group relative overflow-hidden z-50">
+                <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-purple-400/0 via-white/20 to-blue-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 transform -translate-x-full group-hover:translate-x-full z-0 pointer-events-none"></div>
+                
+                {sidebarOpen ? (
+                  <>
+                    <Plus size={18} className="mr-2 group-hover:rotate-90 transition-transform duration-300" />
+                    <span className="font-medium">Create New Project</span>
+                  </>
+                ) : (
+                  <Plus size={22} className="group-hover:rotate-90 transition-transform duration-300" />
+                )}
+              </button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex flex-col z-10 relative">
+          {/* Navbar */}
+          <header className="bg-gray-900/70 backdrop-blur-md border-b border-gray-800/50 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-8">
+                <div className="hidden md:flex space-x-4">
+                  <a href="#" className="text-gray-400 hover:text-white text-sm transition">Tutorials</a>
+                  <a href="#" className="text-gray-400 hover:text-white text-sm transition">Templates</a>
+                  <a href="#" className="text-gray-400 hover:text-white text-sm transition">Support</a>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <button className="relative text-gray-400 hover:text-white p-2 rounded-full hover:bg-gray-800/50 transition">
+                  <HelpCircle size={20} />
+                  <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-purple-500"></span>
+                </button>
+                <div className="relative group">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-sm font-medium cursor-pointer border-2 border-transparent hover:border-white transition-all">
+                    {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
                   </div>
-                  <div className="flex items-center justify-between text-xs text-gray-400 mb-4">
-                    <span>75% complete</span>
-                    <span>7 days left</span>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content Area */}
+          <ScrollArea className="flex-1">
+            <div className="max-w-6xl mx-auto p-6">
+              <div className="relative overflow-hidden rounded-3xl mb-8">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 to-blue-900/40 z-0"></div>
+                <div className="absolute -top-24 -right-24 w-64 h-64 bg-purple-600/20 rounded-full blur-3xl"></div>
+                <div className="absolute -bottom-32 -left-12 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl"></div>
+                
+                <div className="relative z-10 px-8 py-12">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+                    <div className="mb-6 md:mb-0">
+                      <div className="inline-flex items-center px-4 py-2 bg-purple-900/40 border border-purple-500/30 rounded-full text-sm text-purple-300 mb-4">
+                        <Star size={14} className="mr-2 animate-pulse" />
+                        <span>Create Reels</span>
+                      </div>
+                      <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 mb-2">
+                        Reel Creator
+                      </h1>
+                      <p className="text-gray-300 max-w-xl">
+                        Craft viral reels with campaign content and your own clips.
+                      </p>
+                    </div>
                   </div>
-                  <button className="w-full py-3 text-sm font-medium rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 flex items-center justify-center group">
-                    <Zap size={16} className="mr-2 group-hover:animate-pulse" />
-                    Upgrade Now
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="mb-6 p-4 bg-red-900/30 backdrop-blur-sm border border-red-800 rounded-lg flex items-start animate-fadeIn">
+                  <Star className="text-red-400 mr-3 flex-shrink-0" size={20} />
+                  <div>
+                    <h4 className="font-medium text-red-300">Error</h4>
+                    <p className="text-sm text-red-400 mt-1">{error}</p>
+                  </div>
+                  <button 
+                    onClick={() => setError(null)}
+                    className="ml-auto text-red-400 hover:text-red-300"
+                  >
+                    <X size={18} />
                   </button>
+                </div>
+              )}
+
+              {/* Loading State */}
+              {loading && (
+                <div className="text-center text-gray-400 py-12">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+                  <p className="mt-4">Loading campaigns...</p>
+                </div>
+              )}
+
+              {/* Campaigns Grid */}
+              {!loading && campaigns.length === 0 && (
+                <div className="text-center text-gray-400 py-12">
+                  <Video size={48} className="mx-auto mb-4" />
+                  <p>No campaigns found for your YouTube channel.</p>
+                  <Link href="/create" passHref>
+                    <Button className="mt-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white">
+                      Create a Campaign
+                    </Button>
+                  </Link>
+                </div>
+              )}
+
+              {!loading && campaigns.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {campaigns.map(campaign => (
+                    <div
+                      key={campaign.id}
+                      onClick={() => openCampaignDetails(campaign)}
+                      className="relative bg-gray-900/60 backdrop-blur-md border border-gray-800/50 rounded-2xl p-6 shadow-xl shadow-purple-900/5 hover:shadow-purple-900/10 hover:border-purple-500/30 cursor-pointer transition-all duration-300"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-blue-900/10 rounded-2xl z-0"></div>
+                      <div className="relative z-10">
+                        <div className="flex items-center mb-4">
+                          <div className="p-2 bg-purple-900/30 rounded-lg border border-purple-500/30 mr-3">
+                            <Volume2 size={20} className="text-purple-400" />
+                          </div>
+                          <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
+                            {campaign.name}
+                          </h3>
+                        </div>
+                        <p className="text-gray-400 text-sm mb-4 line-clamp-2">{campaign.description}</p>
+                        <div className="space-y-2">
+                          <div className="flex items-center">
+                            <FileMusic size={16} className="text-blue-400 mr-2" />
+                            <span className="text-sm text-gray-300">{campaign.music}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <User size={16} className="text-purple-400 mr-2" />
+                            <span className="text-sm text-gray-300">{campaign.artist_name}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <Users size={16} className="text-blue-400 mr-2" />
+                            <span className="text-sm text-gray-300">
+                              {campaign.selected_influencers.length} Influencer{campaign.selected_influencers.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="mt-4 flex justify-between items-center">
+                          <span className="text-xs text-gray-500">
+                            Created: {new Date(campaign.created_at).toLocaleDateString()}
+                          </span>
+                          <Button
+                            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-sm py-1 px-3"
+                          >
+                            Create Reel
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          {/* Full-Screen Campaign Details Overlay */}
+          {selectedCampaign && (
+            <div className="fixed inset-0 bg-gray-950/95 backdrop-blur-md z-50 overflow-y-auto">
+              <div className="min-h-screen flex flex-col justify-center items-center p-6 md:p-8 lg:p-12">
+                <div className="relative w-full max-w-7xl mx-auto animate-fadeIn">
+                  {/* Close Button */}
+                  <button
+                    onClick={closeCampaignDetails}
+                    className="absolute top-6 right-6 text-gray-400 hover:text-white bg-gray-900/60 rounded-full p-2 transition-all hover:bg-gray-800/80 z-50"
+                  >
+                    <X size={24} />
+                  </button>
+
+                  {/* Hero Section */}
+                  <div className="relative h-64 md:h-72 bg-gradient-to-br from-purple-900/50 to-blue-900/50 rounded-2xl overflow-hidden mb-8">
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-blue-600/20 filter blur-3xl"></div>
+                    <div className="absolute -top-32 -right-32 w-96 h-96 bg-purple-500/10 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '10s' }}></div>
+                    <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-blue-500/10 rounded-full filter blur-3xl animate-pulse" style={{ animationDuration: '15s' }}></div>
+                    <div className="relative z-10 flex items-center justify-center h-full px-6 md:px-12">
+                      <div className="text-center max-w-3xl">
+                        <h1 className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 animate-fadeIn">
+                          {selectedCampaign.name}
+                        </h1>
+                        <p className="text-lg md:text-xl text-gray-300 mt-2 animate-fadeIn" style={{ animationDelay: '0.2s' }}>
+                          {selectedCampaign.music} by {selectedCampaign.artist_name}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Main Content */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Left Column: Campaign Details */}
+                    <div className="lg:col-span-1 space-y-6 animate-fadeIn" style={{ animationDelay: '0.4s' }}>
+                      {/* Campaign Metadata */}
+                      <div className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-gray-800/50 shadow-lg">
+                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-6">
+                          <Star size={24} className="mr-2" />
+                          Campaign Details
+                        </h2>
+                        <div className="space-y-4">
+                          <div className="flex items-start">
+                            <FileMusic size={20} className="text-purple-400 mr-3 mt-1 flex-shrink-0" />
+                            <div>
+                              <span className="text-gray-400 text-sm">Track Title:</span>
+                              <p className="text-white font-medium">{selectedCampaign.music}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start">
+                            <User size={20} className="text-blue-400 mr-3 mt-1 flex-shrink-0" />
+                            <div>
+                              <span className="text-gray-400 text-sm">Artist:</span>
+                              <p className="text-white font-medium">{selectedCampaign.artist_name}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start">
+                            <BookOpen size={20} className="text-purple-400 mr-3 mt-1 flex-shrink-0" />
+                            <div>
+                              <span className="text-gray-400 text-sm">Artist Bio:</span>
+                              <p className="text-gray-300 text-sm">{selectedCampaign.artist_bio || "No artist bio provided."}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start">
+                            <Calendar size={20} className="text-blue-400 mr-3 mt-1 flex-shrink-0" />
+                            <div>
+                              <span className="text-gray-400 text-sm">Created:</span>
+                              <p className="text-gray-300 text-sm">
+                                {selectedCampaign.created_at ? new Date(selectedCampaign.created_at).toLocaleString() : "N/A"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Campaign Description */}
+                      <div className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-gray-800/50 shadow-lg">
+                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4">
+                          <BookOpen size={24} className="mr-2" />
+                          Description
+                        </h2>
+                        <p className="text-gray-300 whitespace-pre-wrap">
+                          {selectedCampaign.description || "No description available."}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Right Columns: Video Editor */}
+                    <div className="lg:col-span-2 space-y-6">
+                      {/* Video Preview */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.6 }}
+                        className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 border border-purple-500/50 shadow-2xl shadow-purple-900/30 relative overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10 z-0"></div>
+                        <div className="absolute -top-24 -right-24 w-64 h-64 bg-purple-600/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '12s' }}></div>
+                        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '15s' }}></div>
+                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4 relative z-10">
+                          <Play size={24} className="mr-2 animate-pulse" />
+                          Reel Preview
+                        </h2>
+                        <div className="relative w-[360px] h-[640px] mx-auto bg-gray-950 rounded-3xl overflow-hidden ring-4 ring-purple-500/30 shadow-xl">
+                          {selectedClips.length === 0 && !backgroundAudio ? (
+                            <div className="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-900/80">
+                              <Video size={48} className="mr-2 animate-bounce" />
+                              <span className="text-center">Select clips or audio to start creating your reel</span>
+                            </div>
+                          ) : (
+                            <Player
+                              ref={playerRef}
+                              component={VideoComposition}
+                              durationInFrames={totalDurationInFrames}
+                              compositionWidth={1080}
+                              compositionHeight={1920}
+                              fps={FPS}
+                              style={{ width: '100%', height: '100%' }}
+                              inputProps={{
+                                clips: selectedClips.map(clip => ({
+                                  src: clip.file_url,
+                                  start: clip.start,
+                                  end: clip.end
+                                })),
+                                audioTrack: backgroundAudio?.file_url,
+                                audioVolume,
+                                totalDurationInFrames
+                              }}
+                              loop={true}
+                              autoPlay={false}
+                            />
+                          )}
+                          <motion.div
+                            className="absolute bottom-4 left-4 right-4 flex justify-between items-center bg-gray-900/70 backdrop-blur-md rounded-full p-2"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.8 }}
+                          >
+                            <Button
+                              onClick={togglePlay}
+                              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-full p-3 hover:scale-110 transition-transform"
+                              disabled={!selectedClips.length && !backgroundAudio}
+                            >
+                              {isPlaying ? <PauseCircle size={28} /> : <PlayCircle size={28} />}
+                            </Button>
+                            <div className="flex items-center space-x-2 bg-gray-800/50 rounded-full px-3 py-1">
+                              <Volume2 size={20} className="text-purple-400" />
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={audioVolume}
+                                onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
+                                className="w-32 h-1 bg-gray-700 rounded-full accent-purple-500 cursor-pointer"
+                                disabled={!backgroundAudio}
+                              />
+                            </div>
+                          </motion.div>
+                        </div>
+                      </motion.div>
+
+                      {/* Timeline */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 0.8 }}
+                        className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-purple-500/50 shadow-lg relative overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-blue-900/10 z-0"></div>
+                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4 relative z-10">
+                          <Film size={24} className="mr-2 animate-pulse" />
+                          Reel Timeline
+                        </h2>
+                        {selectedClips.length > 0 ? (
+                          <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-800 relative z-10">
+                            <AnimatePresence>
+                              {selectedClips.map((clip, index) => (
+                                <motion.div
+                                  key={clip.id}
+                                  drag="x"
+                                  dragControls={dragControls}
+                                  dragConstraints={{ left: 0, right: 0 }}
+                                  onDragEnd={(e, info) => {
+                                    const newIndex = Math.round((index + info.offset.x / 200));
+                                    if (newIndex !== index && newIndex >= 0 && newIndex < selectedClips.length) {
+                                      reorderClips(index, newIndex);
+                                    }
+                                  }}
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.8 }}
+                                  className="flex-shrink-0 w-56 bg-gray-800/70 rounded-xl p-4 border border-purple-500/40 hover:border-purple-400 transition-all shadow-md hover:shadow-purple-500/30 cursor-move"
+                                >
+                                  <div className="relative aspect-[9/16] mb-3 rounded-lg overflow-hidden">
+                                    <video
+                                      src={clip.file_url}
+                                      className="w-full h-full object-cover"
+                                      muted
+                                      onError={(e) => console.error(`Error loading timeline video ${clip.file_url}:`, e)}
+                                    />
+                                    <button
+                                      onClick={() => setSelectedClips(selectedClips.filter(c => c.id !== clip.id))}
+                                      className="absolute top-2 right-2 bg-red-600 rounded-full p-1.5 hover:bg-red-500 transition-colors"
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                    <div className="absolute top-2 left-2 bg-gray-900/80 rounded-full p-1.5">
+                                      <GripVertical size={16} className="text-gray-300" />
+                                    </div>
+                                  </div>
+                                  <div className="text-sm text-gray-200 font-medium truncate mb-2">{clip.name || `Clip ${index + 1}`}</div>
+                                  <div className="flex space-x-2">
+                                    <input
+                                      type="number"
+                                      value={clip.start.toFixed(2)}
+                                      onChange={(e) => updateClipTiming(clip.id, 'start', parseFloat(e.target.value))}
+                                      className="w-20 bg-gray-700/50 text-white rounded-lg px-2 py-1 text-sm border border-gray-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                                      placeholder="Start (s)"
+                                      min="0"
+                                      max={(clipDurations[clip.id] || 10) - 0.1}
+                                      step="0.1"
+                                    />
+                                    <input
+                                      type="number"
+                                      value={clip.end.toFixed(2)}
+                                      onChange={(e) => updateClipTiming(clip.id, 'end', parseFloat(e.target.value))}
+                                      className="w-20 bg-gray-700/50 text-white rounded-lg px-2 py-1 text-sm border border-gray-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                                      placeholder="End (s)"
+                                      min={(clip.start || 0) + 0.1}
+                                      max={clipDurations[clip.id] || 10}
+                                      step="0.1"
+                                    />
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </AnimatePresence>
+                          </div>
+                        ) : (
+                          <div className="text-center text-gray-400 py-6">
+                            <Film size={36} className="mx-auto mb-3 animate-pulse" />
+                            <p>Add clips to the timeline to craft your reel</p>
+                          </div>
+                        )}
+                      </motion.div>
+
+                      {/* Media Selection */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 1 }}
+                        className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-purple-500/50 shadow-lg relative overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-blue-900/10 z-0"></div>
+                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4 relative z-10">
+                          <Video size={24} className="mr-2 animate-pulse" />
+                          Campaign Media
+                        </h2>
+                        {selectedCampaign.campaign_media?.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {selectedCampaign.campaign_media.map((media, index) => (
+                              <motion.div
+                                key={index}
+                                whileHover={{ scale: 1.05, rotate: 1 }}
+                                whileTap={{ scale: 0.95 }}
+                                className={`bg-gray-800/70 rounded-xl p-4 border ${selectedClips.some(clip => clip.id === media.id) || backgroundAudio?.id === media.id ? 'border-purple-500/50 shadow-purple-500/30' : 'border-gray-700/50'} transition-all shadow-md hover:shadow-lg relative z-10`}
+                              >
+                                <div className="flex items-center mb-3">
+                                  <div className="p-2 bg-purple-900/30 rounded-lg border border-purple-500/30 mr-2">
+                                    {media.file_type === 'audio' ? (
+                                      <Volume2 size={18} className="text-purple-400" />
+                                    ) : (
+                                      <Video size={18} className="text-blue-400" />
+                                    )}
+                                  </div>
+                                  <h3 className="text-md font-semibold text-white truncate">
+                                    {media.file_type === 'audio' ? 'Audio Track' : 'Video Clip'} {index + 1}
+                                  </h3>
+                                </div>
+                                {media.file_type === 'audio' ? (
+                                  <div className="space-y-3">
+                                    <audio
+                                      controls
+                                      className="w-full bg-gray-800/50 rounded-lg h-10"
+                                      onError={(e) => console.error(`Error loading audio ${media.file_url}:`, e)}
+                                    >
+                                      <source src={media.file_url} type="audio/mpeg" />
+                                    </audio>
+                                    <Button
+                                      onClick={() => handleAudioSelect(media)}
+                                      className={`w-full text-sm font-medium ${backgroundAudio?.id === media.id ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-700 hover:bg-gray-600'} rounded-lg py-2 transition-all`}
+                                    >
+                                      {backgroundAudio?.id === media.id ? 'Selected' : 'Use as Background Audio'}
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="relative aspect-[9/16] rounded-lg overflow-hidden">
+                                    <video
+                                      src={media.file_url}
+                                      className="w-full h-full object-cover"
+                                      muted
+                                      onError={(e) => console.error(`Error loading video ${media.file_url}:`, e)}
+                                    />
+                                    <Button
+                                      onClick={() => handleClipSelect(media)}
+                                      className={`absolute bottom-2 right-2 text-sm font-medium ${selectedClips.some(clip => clip.id === media.id) ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-700 hover:bg-gray-600'} rounded-lg px-3 py-1.5 transition-all`}
+                                    >
+                                      {selectedClips.some(clip => clip.id === media.id) ? 'Selected' : 'Add to Reel'}
+                                    </Button>
+                                  </div>
+                                )}
+                              </motion.div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="bg-gray-800/40 rounded-xl p-6 border border-gray-700/50 text-center">
+                            <Video size={36} className="mx-auto text-gray-500 mb-3 animate-pulse" />
+                            <p className="text-gray-400">No media files available for this campaign.</p>
+                          </div>
+                        )}
+                      </motion.div>
+
+                      {/* Upload Clips */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 1.2 }}
+                        className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-purple-500/50 shadow-lg relative overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-blue-900/10 z-0"></div>
+                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4 relative z-10">
+                          <Upload size={24} className="mr-2 animate-pulse" />
+                          Upload Your Clips
+                        </h2>
+                        <div className="bg-gray-800/40 rounded-xl p-6 border-2 border-dashed border-purple-500/50 text-center relative z-10">
+                          <input
+                            type="file"
+                            accept="video/*"
+                            multiple
+                            onChange={handleFileUpload}
+                            className="hidden"
+                            ref={fileInputRef}
+                          />
+                          <Button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg px-6 py-3 font-medium shadow-md hover:shadow-lg transition-all"
+                          >
+                            <Upload size={20} className="mr-2" />
+                            Upload Reel Clips
+                          </Button>
+                        </div>
+                        {uploadedClips.length > 0 && (
+                          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {uploadedClips.map((clip, index) => (
+                              <motion.div
+                                key={clip.id}
+                                whileHover={{ scale: 1.05, rotate: 1 }}
+                                whileTap={{ scale: 0.95 }}
+                                className={`bg-gray-800/70 rounded-xl p-4 border ${selectedClips.some(c => c.id === clip.id) ? 'border-purple-500/50 shadow-purple-500/30' : 'border-gray-700/50'} transition-all shadow-md hover:shadow-lg relative z-10`}
+                              >
+                                <div className="flex items-center mb-3">
+                                  <div className="p-2 bg-purple-900/30 rounded-lg border border-purple-500/30 mr-2">
+                                    <Video size={18} className="text-blue-400" />
+                                  </div>
+                                  <h3 className="text-md font-semibold text-white truncate">{clip.name}</h3>
+                                </div>
+                                <div className="relative aspect-[9/16] rounded-lg overflow-hidden">
+                                  <video
+                                    src={clip.file_url}
+                                    className="w-full h-full object-cover"
+                                    muted
+                                    onError={(e) => console.error(`Error loading uploaded video ${clip.file_url}:`, e)}
+                                  />
+                                  <Button
+                                    onClick={() => handleUploadedClipSelect(clip)}
+                                    className={`absolute bottom-2 right-2 text-sm font-medium ${selectedClips.some(c => c.id === clip.id) ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-700 hover:bg-gray-600'} rounded-lg px-3 py-1.5 transition-all`}
+                                  >
+                                    {selectedClips.some(c => c.id === clip.id) ? 'Selected' : 'Add to Reel'}
+                                  </Button>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </div>
+                        )}
+                      </motion.div>
+
+                      {/* Selected Influencers */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5, delay: 1.4 }}
+                        className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-purple-500/50 shadow-lg relative overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-blue-900/10 z-0"></div>
+                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4 relative z-10">
+                          <Users size={24} className="mr-2 animate-pulse" />
+                          Selected Influencers
+                        </h2>
+                        {selectedCampaign.selected_influencers?.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {selectedCampaign.selected_influencers.map((channelId) => {
+                              const influencer = influencers[channelId];
+                              return (
+                                <motion.div
+                                  key={channelId}
+                                  whileHover={{ scale: 1.02 }}
+                                  className="bg-gray-800/70 p-4 rounded-xl border border-gray-700/50 hover:border-purple-500/30 transition-all shadow-md hover:shadow-lg relative z-10"
+                                >
+                                  <div className="flex items-center">
+                                    {influencer?.thumbnail_url ? (
+                                      <img
+                                        src={influencer.thumbnail_url}
+                                        alt={influencer.channel_title}
+                                        className="w-12 h-12 rounded-full mr-3 object-cover border-2 border-purple-500/30"
+                                      />
+                                    ) : (
+                                      <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center mr-3 border-2 border-purple-500/30">
+                                        <User size={20} className="text-gray-400" />
+                                      </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-white font-medium truncate">{influencer?.channel_title || 'Unknown Channel'}</p>
+                                      <a
+                                        href={`https://youtube.com/${influencer?.custom_url || `channel/${channelId}`}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-purple-400 text-sm hover:underline flex items-center"
+                                      >
+                                        <LinkIcon size={12} className="mr-1 flex-shrink-0" />
+                                        <span className="truncate">{influencer?.custom_url || channelId}</span>
+                                      </a>
+                                      <div className="flex items-center mt-1 space-x-3">
+                                        <div className="flex items-center">
+                                          <Users size={12} className="text-purple-400 mr-1 flex-shrink-0" />
+                                          <span className="text-xs text-gray-400">
+                                            {influencer?.subscriber_count ? influencer.subscriber_count.toLocaleString() : 'N/A'} subs
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center">
+                                          <Star size={12} className="text-blue-400 mr-1 flex-shrink-0" />
+                                          <span className="text-xs text-gray-400">
+                                            {influencer?.view_count ? influencer.view_count.toLocaleString() : 'N/A'} views
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="bg-gray-800/40 rounded-xl p-6 border border-gray-700/50 text-center">
+                            <Users size={32} className="mx-auto text-gray-500 mb-2 animate-pulse" />
+                            <p className="text-gray-400">No influencers selected for this campaign.</p>
+                          </div>
+                        )}
+                      </motion.div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           )}
-        </ScrollArea>
-        
-        <div className="p-4 border-t border-gray-800/50">
-          <button className="w-full flex items-center justify-center py-4 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 group relative overflow-hidden">
-            <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-purple-400/0 via-white/20 to-blue-400/0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 transform -translate-x-full group-hover:translate-x-full"></div>
-            
-            {sidebarOpen ? (
-              <>
-                <Plus size={18} className="mr-2 group-hover:rotate-90 transition-transform duration-300" />
-                <span className="font-medium">Create New Project</span>
-              </>
-            ) : (
-              <Plus size={22} className="group-hover:rotate-90 transition-transform duration-300" />
-            )}
-          </button>
         </div>
       </div>
-
-      <div className="flex-1 flex flex-col z-10">
-        <header className="bg-gray-900/70 backdrop-blur-md border-b border-gray-800/50 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-8">
-              <div className="hidden md:flex space-x-4">
-                <a href="#" className="text-gray-400 hover:text-white text-sm transition">Tutorials</a>
-                <a href="#" className="text-gray-400 hover:text-white text-sm transition">Templates</a>
-                <a href="#" className="text-gray-400 hover:text-white text-sm transition">Support</a>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button className="relative text-gray-400 hover:text-white p-2 rounded-full hover:bg-gray-800/50 transition">
-                <HelpCircle size={20} />
-                <span className="absolute top-0 right-0 w-2 h-2 rounded-full bg-purple-500"></span>
-              </button>
-              <div className="relative group">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-sm font-medium cursor-pointer border-2 border-transparent hover:border-white transition-all">
-                  U
-                </div>
-                <div className="absolute top-full right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:translate-y-0 translate-y-2">
-                  <div className="p-3 border-b border-gray-800">
-                    <div className="font-medium">User Name</div>
-                    <div className="text-sm text-gray-400">user@example.com</div>
-                  </div>
-                  <div className="p-2">
-                    <a href="#" className="block px-3 py-2 rounded-md hover:bg-gray-800 text-sm transition">Profile Settings</a>
-                    <a href="#" className="block px-3 py-2 rounded-md hover:bg-gray-800 text-sm transition">Subscription</a>
-                    <a href="#" className="block px-3 py-2 rounded-md hover:bg-gray-800 text-sm transition">Sign Out</a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-auto p-8">
-          <div className="max-w-6xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
-                Create New Video Project
-              </h1>
-              <p className="text-gray-400 mt-2">
-                Upload and transform your videos for social media platforms automatically
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div 
-                className={`relative border ${selectedOption === 'single' ? 'border-purple-500 bg-purple-900/10' : 'border-gray-800 hover:border-purple-400/40 hover:bg-gray-800/30'} 
-                rounded-2xl p-6 transition-all duration-300 cursor-pointer overflow-hidden group`}
-                onClick={() => setSelectedOption('single')}
-              >
-                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-purple-500/10 rounded-full blur-xl group-hover:w-60 group-hover:h-60 transition-all duration-500"></div>
-                <div className="absolute top-0 right-0 p-4">
-                  {selectedOption === 'single' && (
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-500 text-white animate-fadeIn">
-                      <CheckCircle size={16} />
-                    </div>
-                  )}
-                </div>
-                <div className="p-3 bg-purple-500/10 rounded-xl w-14 h-14 flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-all duration-300">
-                  <Video className="text-purple-400 group-hover:text-purple-300 transition-all" size={28} />
-                </div>
-                <h3 className="text-xl font-semibold mb-2 text-white group-hover:text-purple-300 transition-colors">Single Video</h3>
-                <p className="text-gray-400 mb-4 text-sm">
-                  Upload a single video to split into Instagram Reels format with AI-powered editing
-                </p>
-                <div className="inline-flex items-center text-purple-400 text-sm font-medium">
-                  Choose <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </div>
-
-              <div 
-                className={`relative border ${selectedOption === 'bulk' ? 'border-blue-500 bg-blue-900/10' : 'border-gray-800 hover:border-blue-400/40 hover:bg-gray-800/30'} 
-                rounded-2xl p-6 transition-all duration-300 cursor-pointer overflow-hidden group`}
-                onClick={() => setSelectedOption('bulk')}
-              >
-                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-500/10 rounded-full blur-xl group-hover:w-60 group-hover:h-60 transition-all duration-500"></div>
-                <div className="absolute top-0 right-0 p-4">
-                  {selectedOption === 'bulk' && (
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-500 text-white animate-fadeIn">
-                      <CheckCircle size={16} />
-                    </div>
-                  )}
-                </div>
-                <div className="p-3 bg-blue-500/10 rounded-xl w-14 h-14 flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-all duration-300">
-                  <Folder className="text-blue-400 group-hover:text-blue-300 transition-all" size={28} />
-                </div>
-                <h3 className="text-xl font-semibold mb-2 text-white group-hover:text-blue-300 transition-colors">Bulk Upload</h3>
-                <p className="text-gray-400 mb-4 text-sm">
-                  Process multiple videos at once for different social media platforms
-                </p>
-                <div className="inline-flex items-center text-blue-400 text-sm font-medium">
-                  Choose <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </div>
-            </div>
-
-            {selectedOption === 'single' && (
-              <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 mb-8 transition-all animate-fadeIn relative overflow-hidden">
-                {/* Dynamic background with vibrant effects */}
-                <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-900/30 rounded-full filter blur-3xl animate-pulse"></div>
-                <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-900/30 rounded-full filter blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
-                <div className="absolute top-1/3 right-1/3 w-64 h-64 bg-purple-700/20 rounded-full filter blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-                <div className="absolute bottom-1/3 left-1/3 w-48 h-48 bg-blue-700/20 rounded-full filter blur-3xl animate-pulse" style={{ animationDelay: '3s' }}></div>
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-to-r from-purple-900/10 to-blue-900/10 rounded-full filter blur-3xl"></div>
-
-                <div className="text-center mb-6 relative z-10">
-                  <h2 className="text-2xl font-semibold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-blue-300">Upload Your Reel</h2>
-                  <p className="text-gray-400">Drag and drop your video to create an Instagram Reel with AI enhancements.</p>
-                </div>
-
-                <motion.div 
-                  className={`border-2 border-dashed rounded-xl py-16 px-8 text-center transition-all relative z-10 ${dragActive ? 'border-purple-500 bg-purple-900/20 shadow-xl shadow-purple-900/40' : 'border-gray-700'}`}
-                  onDragEnter={handleDragEnter}
-                  onDragLeave={handleDragLeave}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={handleDrop}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <input 
-                    type="file" 
-                    accept="video/*" 
-                    onChange={handleVideoUpload} 
-                    className="hidden" 
-                    ref={videoInputRef}
-                  />
-                  
-                  {!uploadedVideo && (
-                    <div>
-                      <motion.div 
-                        animate={pulseAnimation}
-                        className="mx-auto w-32 h-32 bg-gradient-to-br from-purple-900/40 to-blue-900/40 rounded-full flex items-center justify-center mb-8 relative group"
-                      >
-                        <div className="absolute inset-0 rounded-full border-2 border-dashed border-purple-500/50 animate-spin-slow"></div>
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500/30 to-blue-500/30 opacity-0 group-hover:opacity-100 scale-110 transition-all duration-300"></div>
-                        <Upload size={40} className="text-purple-400 group-hover:scale-110 transition-all duration-300" />
-                      </motion.div>
-                      <h4 className="text-2xl font-medium mb-3 bg-clip-text text-transparent bg-gradient-to-r from-purple-300 to-blue-300">Drag your reel here</h4>
-                      <p className="text-gray-400 mb-10 max-w-lg mx-auto leading-relaxed">
-                        Upload your video for Instagram Reels. We support vertical format videos (9:16) and other aspect ratios. Your reel will be processed with AI enhancements in minutes.
-                      </p>
-                      <motion.button
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={triggerVideoInput}
-                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium py-4 px-10 rounded-lg transition-all shadow-xl shadow-purple-900/30 hover:shadow-purple-900/50 relative overflow-hidden group"
-                      >
-                        <span className="relative z-10 flex items-center justify-center text-lg">
-                          <Zap size={22} className="mr-2" />
-                          Select Reel
-                        </span>
-                        <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-purple-500/0 via-white/20 to-blue-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 transform -translate-x-full group-hover:translate-x-full"></div>
-                      </motion.button>
-                      <p className="text-xs text-gray-500 mt-6">
-                        By uploading, you agree to our Terms of Service
-                      </p>
-                    </div>
-                  )}
-                  
-                  
-                  {uploadedVideo && videoInfo && (
-                    <div>
-                      <div className="mx-auto w-16 h-16 bg-green-900/20 rounded-full flex items-center justify-center mb-4">
-                        <CheckCircle size={28} className="text-green-400" />
-                      </div>
-                      <p className="text-gray-300 mb-2">Video uploaded successfully</p>
-                      <h3 className="text-lg font-medium mb-2">{videoInfo.name}</h3>
-                      <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-400 mb-4">
-                        <span>Duration: {videoInfo.duration.toFixed(1)}s</span>
-                        <span>Resolution: {videoInfo.width}x{videoInfo.height}</span>
-                      </div>
-                      
-                      {!isProcessing && segmentVideos.length === 0 && (
-                        <button 
-                          onClick={() => splitVideo(videoInfo)}
-                          className="px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg text-white font-medium transition-all shadow-lg shadow-purple-900/30 hover:shadow-purple-900/50 flex items-center justify-center mx-auto"
-                          disabled={isProcessing}
-                        >
-                          <Scissors size={18} className="mr-2" />
-                          Split into Instagram Reels
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </motion.div>
-
-                {isProcessing && (
-                  <div className="mt-6 animate-fadeIn">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-400">Processing video...</span>
-                      <span className="text-sm text-gray-400">{Math.round(progress)}%</span>
-                    </div>
-                    <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-300"
-                        style={{ width: `${progress}%` }}
-                      ></div>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-500">{message}</p>
-                  </div>
-                )}
-
-                {segmentVideos.length > 0 && (
-                  <div className="mt-8 animate-fadeIn">
-                    <h3 className="text-xl font-semibold mb-4">Instagram Reels Segments</h3>
-                    <p className="text-gray-400 mb-6">Your video has been split into {segmentVideos.length} Instagram Reels format clips. Generate or manually add subtitles and choose a style for each segment.</p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {segmentVideos.map((segment, index) => (
-                        <div key={index} className="border border-gray-800 rounded-xl overflow-hidden bg-gray-900/50 group">
-                          <div className="aspect-[9/16] relative overflow-hidden bg-black">
-                            <Player
-                              key={index}
-                              component={VideoWithSubtitle}
-                              inputProps={{
-                                videoUrl: segment.url,
-                                subtitles: segmentSubtitles[index] || [],
-                                styleType: subtitleStyles[index] || 'none'
-                              }}
-                              durationInFrames={Math.ceil(segment.duration * 30)}
-                              compositionWidth={607}
-                              compositionHeight={1080}
-                              fps={30}
-                              controls
-                              autoPlay
-                              loop
-                              style={{
-                                width: '100%',
-                                height: '100%'
-                              }}
-                            />
-                          </div>
-                          
-                          <div className="p-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <h4 className="font-medium">Segment {index + 1}</h4>
-                              <span className="text-sm text-gray-400">
-                                {Math.floor(segment.startTime / 60)}:{(segment.startTime % 60).toString().padStart(2, '0')} - 
-                                {Math.floor((segment.startTime + segment.duration) / 60)}:{((segment.startTime + segment.duration) % 60).toString().padStart(2, '0')}
-                              </span>
-                            </div>
-                            
-                            <div className="mb-4">
-                              <label className="text-sm text-gray-400 block mb-1">Subtitle Style</label>
-                              <select
-                                value={subtitleStyles[index] || 'none'}
-                                onChange={(e) => handleSubtitleStyleChange(index, e.target.value)}
-                                className="w-full bg-gray-800 border border-gray-700 rounded-lg p-2 text-sm text-gray-300"
-                              >
-                                <option value="none">Default</option>
-                                <option value="hormozi">Alex Hormozi</option>
-                                <option value="abdaal">Ali Abdaal</option>
-                                <option value="neonGlow">Neon Glow</option>
-                                <option value="retroWave">Retro Wave</option>
-                                <option value="minimalPop">Minimal Pop</option>
-                              </select>
-                            </div>
-
-                            <div className="mb-4">
-                              <button
-                                onClick={() => setEditingSegmentIndex(editingSegmentIndex === index ? null : index)}
-                                className="w-full py-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-white font-medium transition-all flex items-center justify-center"
-                              >
-                                {editingSegmentIndex === index ? 'Close Subtitle Editor' : 'Edit Subtitles'}
-                              </button>
-                            </div>
-
-                            {editingSegmentIndex === index && (
-                              <div className="mb-4 p-4 bg-gray-800 rounded-lg">
-                                <h5 className="text-sm font-medium mb-2">Add New Subtitle</h5>
-                                <div className="grid grid-cols-3 gap-2 mb-2">
-                                  <input
-                                    type="text"
-                                    placeholder="Subtitle text"
-                                    value={newSubtitle.text}
-                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, text: e.target.value })}
-                                    className="col-span-3 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
-                                  />
-                                  <input
-                                    type="number"
-                                    placeholder="Start (s)"
-                                    value={newSubtitle.start}
-                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, start: e.target.value })}
-                                    className="bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
-                                    step="0.1"
-                                    min="0"
-                                    max={segment.duration}
-                                  />
-                                  <input
-                                    type="number"
-                                    placeholder="End (s)"
-                                    value={newSubtitle.end}
-                                    onChange={(e) => setNewSubtitle({ ...newSubtitle, end: e.target.value })}
-                                    className="bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
-                                    step="0.1"
-                                    min="0"
-                                    max={segment.duration}
-                                  />
-                                  <button
-                                    onClick={() => handleAddSubtitle(index)}
-                                    className="bg-purple-600 hover:bg-purple-500 rounded-lg p-2 text-sm text-white"
-                                  >
-                                    Add
-                                  </button>
-                                </div>
-
-                                <div className="mb-2">
-                                  <h5 className="text-sm font-medium mb-1">Timeline</h5>
-                                  <div className="relative h-8 bg-gray-700 rounded-lg">
-                                    {segmentSubtitles[index]?.map((sub, i) => (
-                                      <div
-                                        key={i}
-                                        className="absolute h-8 bg-purple-500 rounded-lg"
-                                        style={{
-                                          left: `${(sub.start / segment.duration) * 100}%`,
-                                          width: `${((sub.end - sub.start) / segment.duration) * 100}%`
-                                        }}
-                                        title={`${sub.text} (${sub.start.toFixed(1)}s - ${sub.end.toFixed(1)}s)`}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-
-                                <div className="max-h-40 overflow-auto">
-                                  <h5 className="text-sm font-medium mb-1">Existing Subtitles</h5>
-                                  {segmentSubtitles[index]?.length > 0 ? (
-                                    segmentSubtitles[index].map((sub, i) => (
-                                      <div key={i} className="flex items-center gap-2 mb-2">
-                                        <input
-                                          type="text"
-                                          value={sub.text}
-                                          onChange={(e) => handleEditSubtitle(index, i, { ...sub, text: e.target.value })}
-                                          className="flex-1 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
-                                        />
-                                        <input
-                                          type="number"
-                                          value={sub.start}
-                                          onChange={(e) => handleEditSubtitle(index, i, { ...sub, start: e.target.value })}
-                                          className="w-20 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
-                                          step="0.1"
-                                          min="0"
-                                          max={segment.duration}
-                                        />
-                                        <input
-                                          type="number"
-                                          value={sub.end}
-                                          onChange={(e) => handleEditSubtitle(index, i, { ...sub, end: e.target.value })}
-                                          className="w-20 bg-gray-700 border border-gray-600 rounded-lg p-2 text-sm text-gray-300"
-                                          step="0.1"
-                                          min="0"
-                                          max={segment.duration}
-                                        />
-                                        <button
-                                          onClick={() => handleDeleteSubtitle(index, i)}
-                                          className="bg-red-600 hover:bg-red-500 rounded-lg p-2 text-sm text-white"
-                                        >
-                                          Delete
-                                        </button>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <span className="text-gray-500">No subtitles added</span>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                            
-                            <button
-                              onClick={() => generateSubtitles(index)}
-                              className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg text-white font-medium transition-all shadow-md shadow-blue-900/20 hover:shadow-blue-900/40 flex items-center justify-center mb-2"
-                              disabled={isGeneratingSubtitles[index] || isProcessing}
-                            >
-                              <Sparkles size={18} className="mr-2" />
-                              {isGeneratingSubtitles[index] ? 'Generating Subtitles...' : 'Generate Subtitles'}
-                            </button>
-                            
-                            <button
-                              onClick={() => downloadSegmentWithRemotion(index)}
-                              className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-lg text-white font-medium transition-all shadow-md shadow-purple-900/20 hover:shadow-purple-900/40 flex items-center justify-center"
-                              disabled={isProcessing || isGeneratingSubtitles[index]}
-                            >
-                              <Download size={18} className="mr-2" />
-                              Download with Subtitles
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            {selectedOption === 'bulk' && (
-              <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 mb-8 transition-all animate-fadeIn">
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-semibold mb-2">Bulk Upload</h2>
-                  <p className="text-gray-400">Process multiple videos for different social media platforms at once</p>
-                </div>
-                
-                {!bulkUploadComplete ? (
-                  <BulkUpload onComplete={() => setBulkUploadComplete(true)} />
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="w-16 h-16 bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <CheckCircle size={28} className="text-green-400" />
-                    </div>
-                    <h3 className="text-xl font-medium mb-2">Bulk Processing Complete!</h3>
-                    <p className="text-gray-400 mb-6">Your videos have been processed and are ready for download</p>
-                    <button className="px-6 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition-all shadow-lg shadow-blue-900/30 hover:shadow-blue-900/50">
-                      View All Processed Videos
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            
-            <div className="bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-8 transition-all animate-fadeIn">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-semibold">Recent Projects</h2>
-                <button className="text-sm text-purple-400 hover:text-purple-300 flex items-center">
-                  View All <ChevronRight size={16} className="ml-1" />
-                </button>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {recentProjects.map((project, index) => (
-                  <div key={index} className="border border-gray-800 rounded-xl overflow-hidden bg-gray-900/50 hover:border-gray-700 transition-all group">
-                    <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 relative">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Play size={36} className="text-gray-600 group-hover:text-purple-400 transition-colors" />
-                      </div>
-                      {project.progress < 100 && (
-                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-800">
-                          <div 
-                            className="h-full bg-gradient-to-r from-purple-500 to-blue-500"
-                            style={{ width: `${project.progress}%` }}
-                          ></div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <div className="flex items-center justify-between mb-1">
-                        <h4 className="font-medium">{project.name}</h4>
-                        {project.progress === 100 ? (
-                          <span className="text-xs px-2 py-1 rounded-full bg-green-900/20 text-green-400">Completed</span>
-                        ) : (
-                          <span className="text-xs px-2 py-1 rounded-full bg-purple-900/20 text-purple-400">In Progress</span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between text-sm text-gray-400">
-                        <span className="flex items-center"><Clock size={14} className="mr-1" /> {project.date}</span>
-                        <span>Instagram Reels</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
 }
