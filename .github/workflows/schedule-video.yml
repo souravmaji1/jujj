@@ -2,7 +2,7 @@ name: Schedule Video Rendering
 
 on:
   schedule:
-    - cron: '0 */3 * * *' # Every 3 hours
+    - cron: '*/1 * * * *'
 
 jobs:
   schedule:
