@@ -2,11 +2,22 @@ import { AbsoluteFill, Audio, Video as RemotionVideo, Sequence, Composition } fr
 
 // Constants
 export const FPS = 30;
+
 export const DURATION_IN_FRAMES = 900; // 10 seconds at 30 FPS
 
 
+
+
+/**
+ * VideoComposition component
+ * @param {Object} props
+ * @param {{ src: string, start: number, end: number }[]} props.videoUrls - Array of video clips
+ * @param {string | null} props.audioUrl - URL of the audio track
+ * @param {number} props.audioVolume - Audio volume (0 to 1)
+ * @param {number} props.totalDurationInFrames - Total duration in frames
+ */
 export const VideoComposition = ({ videoUrls, audioUrl, audioVolume, totalDurationInFrames }) => {
-  console.log('Props received:', { videoUrls, audioUrl, audioVolume, totalDurationInFrames });
+
   return (
     <AbsoluteFill style={{ backgroundColor: '#111827' }}>
       <Sequence from={0} durationInFrames={totalDurationInFrames}>
