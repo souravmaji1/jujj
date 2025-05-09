@@ -23,7 +23,7 @@
       };
       console.log('Dispatching workflow with props:', JSON.stringify(props));
   
-      const githubToken = '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';
+      const githubToken = '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';
       const repoOwner = 'souravmaji1';
       const repoName = 'jujj';
   

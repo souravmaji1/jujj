@@ -1,19 +1,22 @@
 {
-  "videoUrls": [
-    {
-      "src": "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/user_2vJ7zMGd8wt97m26vnldmkts30s/1746684700552_db035aa7-3598-4a8b-bfd7-9356fd5a762d.mp4",
-      "start": 0,
-      "end": 5.085011
-    },
-    {
-      "src": "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/user_2vJ7zMGd8wt97m26vnldmkts30s/1746684700552_one.mp4",
-      "start": 0,
-      "end": 16.5
-    }
-  ],
+  "videoUrls":  [
+  {
+    "end": 10,
+    "src": "https://videos.pexels.com/video-files/2786540/2786540-sd_960_540_25fps.mp4",
+    "start": 0
+  },
+  {
+    "end": 20,
+    "src": "https://videos.pexels.com/video-files/3617005/3617005-hd_1280_720_24fps.mp4",
+    "start": 10
+  },
+  {
+    "end": 30,
+    "src": "https://videos.pexels.com/video-files/3245641/3245641-uhd_2560_1440_25fps.mp4",
+    "start": 20
+  }
+],
   "audioUrl": "https://fmkjdrdiifebucfpkbsz.supabase.co/storage/v1/object/public/avatars/user_2vJ7zMGd8wt97m26vnldmkts30s/1746684700549_dua.mp3",
-  "duration": 21.585011,
   "totalDurationInFrames": 648,
-  "audioVolume": 0.5,
-  "outputFile": "rendered_1746709301298.mp4"
+  "audioVolume": 0.5
 }

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -8,6 +8,8 @@ import {
   HelpCircle,
   ChevronRight,
   ChevronDown,
+  SquarePlus,
+  ChartColumnDecreasing,
   Video,
   BookOpen,
   Music,
@@ -23,134 +25,38 @@ import {
   Volume2,
   FileMusic,
   Calendar,
-  Link as LinkIcon,
-  Upload,
-  Film,
-  PlayCircle,
-  PauseCircle,
-  GripVertical
+  Link as LinkIcon
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Player } from '@remotion/player';
-import { Video as RemotionVideo, Audio, Sequence, AbsoluteFill } from 'remotion';
-import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_SECRET;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Remotion Video Composition Component
-const FPS = 30;
-
-const VideoComposition = ({ clips, audioTrack, audioVolume, totalDurationInFrames }) => {
-  let currentFrame = 0;
-
-  return (
-    <AbsoluteFill style={{ backgroundColor: '#111827' }}>
-      {clips && clips.length > 0 ? (
-        clips.map((clip, index) => {
-          const startFrame = currentFrame;
-          const durationInSeconds = Math.max((clip.end - clip.start), 1 / FPS);
-          const durationInFrames = Math.round(durationInSeconds * FPS);
-          currentFrame += durationInFrames;
-
-          return (
-            <Sequence key={index} from={startFrame} durationInFrames={durationInFrames}>
-              <RemotionVideo
-                src={clip.src}
-                startFrom={Math.round(clip.start * FPS)}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                onError={(e) => console.error(`Error loading video ${clip.src}:`, e)}
-              />
-            </Sequence>
-          );
-        })
-      ) : (
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            backgroundColor: '#1a1a1a',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#888',
-          }}
-        >
-          No clips selected
-        </div>
-      )}
-      {audioTrack && (
-        <Audio
-          src={audioTrack}
-          volume={audioVolume}
-          loop
-          onError={(e) => console.error(`Error loading audio ${audioTrack}:`, e)}
-        />
-      )}
-    </AbsoluteFill>
-  );
-};
-
-export default function VideoCreatorPage() {
+export default function CreatedCampaignsPage() {
   const { user } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedNav, setSelectedNav] = useState('video-creator');
+  const [selectedNav, setSelectedNav] = useState('library');
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedCampaign, setSelectedCampaign] = useState(null);
-  const [userRole, setUserRole] = useState('seller');
+  const [userRole, setUserRole] = useState('buyer');
   const [isAnimating, setIsAnimating] = useState(false);
-  const [userChannelId, setUserChannelId] = useState(null);
   const [influencers, setInfluencers] = useState({});
-  const [selectedClips, setSelectedClips] = useState([]);
-  const [backgroundAudio, setBackgroundAudio] = useState(null);
-  const [uploadedClips, setUploadedClips] = useState([]);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioVolume, setAudioVolume] = useState(0.5);
-  const [clipDurations, setClipDurations] = useState({});
-  const [rendering, setRendering] = useState(false);
-  const [renderError, setRenderError] = useState(null);
-  const fileInputRef = useRef(null);
-  const playerRef = useRef(null);
-  const dragControls = useDragControls();
 
-  // Calculate total duration based on selected clips
-  const totalDurationInSeconds = selectedClips.reduce((sum, clip) => {
-    const duration = clip.end - clip.start;
-    return sum + (isNaN(duration) ? 0 : duration);
-  }, 0);
-  const totalDurationInFrames = Math.max(Math.round(totalDurationInSeconds * FPS), 600);
-
-  // Fetch user's YouTube channel ID and campaigns
+  // Fetch campaigns created by the user
   useEffect(() => {
     if (!user) return;
 
-    const fetchUserChannelAndCampaigns = async () => {
+    const fetchUserCampaigns = async () => {
       try {
         setLoading(true);
 
-        const { data: influencerData, error: influencerError } = await supabase
-          .from('youtube_influencer')
-          .select('channel_id')
-          .eq('user_id', user.id)
-          .single();
-
-        if (influencerError) throw new Error(`Failed to fetch influencer data: ${influencerError.message}`);
-
-        const channelId = influencerData?.channel_id;
-        setUserChannelId(channelId);
-
-        if (!channelId) {
-          setError('No YouTube channel associated with this account');
-          setCampaigns([]);
-          return;
-        }
-
+        // Fetch campaigns where user_id matches the authenticated user
         const { data: campaignData, error: campaignError } = await supabase
           .from('campaigns')
           .select(`
@@ -161,10 +67,11 @@ export default function VideoCreatorPage() {
               file_type
             )
           `)
-          .contains('selected_influencers', [channelId]);
+          .eq('user_id', user.id);
 
         if (campaignError) throw new Error(`Failed to fetch campaigns: ${campaignError.message}`);
 
+        // Fetch all influencers for campaigns
         const influencerIds = campaignData.flatMap(c => c.selected_influencers);
         if (influencerIds.length > 0) {
           const { data: influencerData, error: influencerFetchError } = await supabase
@@ -190,7 +97,7 @@ export default function VideoCreatorPage() {
       }
     };
 
-    fetchUserChannelAndCampaigns();
+    fetchUserCampaigns();
   }, [user]);
 
   useEffect(() => {
@@ -199,219 +106,16 @@ export default function VideoCreatorPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Function to fetch clip duration
-  const fetchClipDuration = async (clip) => {
-    try {
-      const video = document.createElement('video');
-      video.src = clip.file_url;
-      const duration = await new Promise((resolve, reject) => {
-        video.onloadedmetadata = () => resolve(video.duration);
-        video.onerror = () => reject(new Error(`Failed to load metadata for ${clip.file_url}`));
-      });
-      return duration;
-    } catch (err) {
-      console.error(err);
-      return 10; // Fallback duration
-    }
-  };
-
-  // Function to handle video rendering
-  const handleRenderVideo = async () => {
-    if (selectedClips.length === 0 && !backgroundAudio) {
-      setRenderError('Please select at least one clip or audio track to render.');
-      return;
-    }
-
-    setRendering(true);
-    setRenderError(null);
-
-    try {
-      const videoUrls = selectedClips.map(clip => ({
-        src: clip.file_url,
-        start: clip.start,
-        end: clip.end
-      }));
-
-      const payload = {
-        videoUrls,
-        audioUrl: backgroundAudio?.file_url || '',
-        duration: totalDurationInSeconds
-      };
-
-      console.log(payload)
-
-      const response = await fetch('/api/render', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to render video');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `reel_${Date.now()}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error rendering video:', error);
-      setRenderError(error.message || 'Failed to render video');
-    } finally {
-      setRendering(false);
-    }
-  };
-
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
   const openCampaignDetails = (campaign) => {
     setSelectedCampaign(campaign);
-    setSelectedClips([]);
-    setBackgroundAudio(null);
-    setUploadedClips([]);
-    setIsPlaying(false);
-    setClipDurations({});
   };
 
   const closeCampaignDetails = () => {
     setSelectedCampaign(null);
-  };
-
-  const handleClipSelect = async (media) => {
-    if (selectedClips.some((clip) => clip.id === media.id)) {
-      setSelectedClips(selectedClips.filter((clip) => clip.id !== media.id));
-    } else {
-      const duration = await fetchClipDuration(media);
-      setClipDurations(prev => ({ ...prev, [media.id]: duration }));
-      setSelectedClips([
-        ...selectedClips,
-        { ...media, start: 0, end: duration }
-      ]);
-    }
-  };
-
-  const handleAudioSelect = (media) => {
-    setBackgroundAudio(backgroundAudio?.id === media.id ? null : media);
-  };
-
-  const handleFileUpload = async (event) => {
-    const files = event.target.files;
-    if (!files) return;
-
-    try {
-      const uploaded = [];
-      const newDurations = { ...clipDurations };
-      for (const file of files) {
-        if (file.type.startsWith('video/')) {
-          const { data, error } = await supabase.storage
-            .from('avatars')
-            .upload(`${user.id}/${Date.now()}_${file.name}`, file);
-
-          if (error) throw error;
-
-          const { data: publicUrlData } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(data.path);
-
-          const video = document.createElement('video');
-          video.src = URL.createObjectURL(file);
-          const duration = await new Promise((resolve, reject) => {
-            video.onloadedmetadata = () => resolve(video.duration);
-            video.onerror = () => reject(new Error(`Failed to load metadata for ${file.name}`));
-          });
-
-          const clip = {
-            id: `uploaded_${Date.now()}_${file.name}`,
-            file_url: publicUrlData.publicUrl,
-            file_type: 'video',
-            name: file.name,
-            start: 0,
-            end: duration
-          };
-          uploaded.push(clip);
-          newDurations[clip.id] = duration;
-        }
-      }
-      setUploadedClips([...uploadedClips, ...uploaded]);
-      setClipDurations(newDurations);
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      setError('Failed to upload clips');
-    }
-  };
-
-  const handleUploadedClipSelect = async (clip) => {
-    if (selectedClips.some((c) => c.id === clip.id)) {
-      setSelectedClips(selectedClips.filter((c) => c.id !== clip.id));
-    } else {
-      const duration = clipDurations[clip.id] || await fetchClipDuration(clip);
-      if (!clipDurations[clip.id]) {
-        setClipDurations(prev => ({ ...prev, [clip.id]: duration }));
-      }
-      setSelectedClips([
-        ...selectedClips,
-        { ...clip, start: 0, end: duration }
-      ]);
-    }
-  };
-
-  const reorderClips = (fromIndex, toIndex) => {
-    const newClips = [...selectedClips];
-    const [movedClip] = newClips.splice(fromIndex, 1);
-    newClips.splice(toIndex, 0, movedClip);
-    setSelectedClips(newClips);
-  };
-
-  const updateClipTiming = (clipId, field, value) => {
-    setSelectedClips(clips =>
-      clips.map((clip) => {
-        if (clip.id !== clipId) return clip;
-
-        const maxDuration = clipDurations[clipId] || 10;
-        let newStart = clip.start || 0;
-        let newEnd = clip.end || maxDuration;
-        const newValue = Math.max(0, parseFloat(value) || 0);
-
-        if (field === 'start') {
-          newStart = Math.min(newValue, maxDuration - 0.1);
-          newEnd = Math.max(newStart + 0.1, Math.min(newEnd, maxDuration));
-        } else if (field === 'end') {
-          newEnd = Math.min(newValue, maxDuration);
-          newStart = Math.min(newStart, newEnd - 0.1);
-        }
-
-        return { ...clip, start: newStart, end: newEnd };
-      })
-    );
-  };
-
-  const togglePlay = () => {
-    if (playerRef.current) {
-      try {
-        if (isPlaying) {
-          playerRef.current.pause();
-        } else {
-          playerRef.current.play();
-        }
-        setIsPlaying(!isPlaying);
-      } catch (err) {
-        console.error('Error controlling player:', err);
-        setError('Failed to control video playback');
-      }
-    } else {
-      console.warn('Player ref is not initialized');
-      setError('Video player is not ready');
-    }
   };
 
   const NavItem = ({ icon, label, active, onClick, href }) => {
@@ -536,27 +240,28 @@ export default function VideoCreatorPage() {
                     onClick={() => setSelectedNav('dashboard')}
                     href="/dashboard"
                   />
-                  <NavItem 
-                    icon={<Video size={20} />} 
-                    label="Create Campaign" 
-                    active={selectedNav === 'create'} 
-                    onClick={() => setSelectedNav('create')}
-                    href="/create"
-                  />
-                  <NavItem 
-                    icon={<BookOpen size={20} />} 
-                    label="Video Library" 
-                    active={selectedNav === 'library'} 
-                    onClick={() => setSelectedNav('library')}
-                    href="/videolibrary"
-                  />
-                  <NavItem 
-                    icon={<Music size={20} />} 
-                    label="Your Stats" 
-                    active={selectedNav === 'stats'} 
-                    onClick={() => setSelectedNav('stats')}
-                    href="/stats"
-                  />
+             
+                                   <NavItem
+                                     icon={<SquarePlus size={20} />}
+                                     label="Create Campaign"
+                                     active={selectedNav === 'create'}
+                                     onClick={() => setSelectedNav('create')}
+                                     href="/createcampaign"
+                                   />
+                                   <NavItem
+                                     icon={<BookOpen size={20} />}
+                                     label="Manage Campaign"
+                                     active={selectedNav === 'library'}
+                                     onClick={() => setSelectedNav('library')}
+                                     href="/managecampaign"
+                                   />
+                                   <NavItem
+                                     icon={<ChartColumnDecreasing size={20} />}
+                                     label="Your Stats"
+                                     active={selectedNav === 'stats'}
+                                     onClick={() => setSelectedNav('stats')}
+                                     href="/campaignstats"
+                                   />
                 </>
               ) : (
                 <>
@@ -575,11 +280,13 @@ export default function VideoCreatorPage() {
                     href="/campaigns"
                   />
                   <NavItem 
-                    icon={<Film size={20} />} 
-                    label="Video Creator" 
-                    active={selectedNav === 'video-creator'} 
-                    onClick={() => setSelectedNav('video-creator')}
-                    href="/video-creator"
+                    icon={<BookOpen size={20} />} 
+                    label="Post Remixing" 
+                    active={selectedNav === 'remixing'} 
+                    onClick={() => setSelectedNav('remixing')}
+                    href="/post-rem Comparable artifact content continues...
+
+ixing"
                   />
                   <NavItem 
                     icon={<Sparkles size={20} />} 
@@ -604,17 +311,17 @@ export default function VideoCreatorPage() {
             <div className={`mb-8 transition-all duration-500 delay-100 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
               {sidebarOpen && (
                 <div className="flex items-center justify-between px-4 mb-4">
-                  <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Workspace</h3>
+                  <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Marketplace</h3>
                   <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
                 </div>
               )}
               <ul className="space-y-2">
                 <NavItem 
                   icon={<Users size={20} />} 
-                  label="Pricing" 
+                  label="Accounts" 
                   active={selectedNav === 'pricing'} 
                   onClick={() => setSelectedNav('pricing')}
-                  href="/pricing"
+                  href="/rentaccounts"
                 />
                 <NavItem 
                   icon={<Settings size={20} />} 
@@ -626,7 +333,7 @@ export default function VideoCreatorPage() {
                 </ul>
               </div>
             )}
-
+  
             {sidebarOpen && (
               <div className={`mt-8 transition-all duration-500 delay-200 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
                 <div className="relative overflow-hidden rounded-2xl">
@@ -660,7 +367,7 @@ export default function VideoCreatorPage() {
               </div>
             )}
           </ScrollArea>
-
+  
           <div className="p-4 border-t border-gray-800/50">
             <Link href="/create" passHref>
               <button className="w-full flex items-center justify-center py-4 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 group relative overflow-hidden z-50">
@@ -678,7 +385,7 @@ export default function VideoCreatorPage() {
             </Link>
           </div>
         </div>
-
+  
         {/* Main Content */}
         <div className="flex-1 flex flex-col z-10 relative">
           {/* Navbar */}
@@ -704,7 +411,7 @@ export default function VideoCreatorPage() {
               </div>
             </div>
           </header>
-
+  
           {/* Main Content Area */}
           <ScrollArea className="flex-1">
             <div className="max-w-6xl mx-auto p-6">
@@ -718,19 +425,19 @@ export default function VideoCreatorPage() {
                     <div className="mb-6 md:mb-0">
                       <div className="inline-flex items-center px-4 py-2 bg-purple-900/40 border border-purple-500/30 rounded-full text-sm text-purple-300 mb-4">
                         <Star size={14} className="mr-2 animate-pulse" />
-                        <span>Create Reels</span>
+                        <span>Your Created Campaigns</span>
                       </div>
                       <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 mb-2">
-                        Reel Creator
+                        Your Campaigns
                       </h1>
                       <p className="text-gray-300 max-w-xl">
-                        Craft viral reels with campaign content and your own clips.
+                        View and manage the music promotion campaigns you have created.
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
-
+  
               {/* Error Message */}
               {error && (
                 <div className="mb-6 p-4 bg-red-900/30 backdrop-blur-sm border border-red-800 rounded-lg flex items-start animate-fadeIn">
@@ -747,24 +454,7 @@ export default function VideoCreatorPage() {
                   </button>
                 </div>
               )}
-
-              {/* Render Error Message */}
-              {renderError && (
-                <div className="mb-6 p-4 bg-red-900/30 backdrop-blur-sm border border-red-800 rounded-lg flex items-start animate-fadeIn">
-                  <Star className="text-red-400 mr-3 flex-shrink-0" size={20} />
-                  <div>
-                    <h4 className="font-medium text-red-300">Render Error</h4>
-                    <p className="text-sm text-red-400 mt-1">{renderError}</p>
-                  </div>
-                  <button 
-                    onClick={() => setRenderError(null)}
-                    className="ml-auto text-red-400 hover:text-red-300"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              )}
-
+  
               {/* Loading State */}
               {loading && (
                 <div className="text-center text-gray-400 py-12">
@@ -772,12 +462,12 @@ export default function VideoCreatorPage() {
                   <p className="mt-4">Loading campaigns...</p>
                 </div>
               )}
-
+  
               {/* Campaigns Grid */}
               {!loading && campaigns.length === 0 && (
                 <div className="text-center text-gray-400 py-12">
                   <Video size={48} className="mx-auto mb-4" />
-                  <p>No campaigns found for your YouTube channel.</p>
+                  <p>You haven't created any campaigns yet.</p>
                   <Link href="/create" passHref>
                     <Button className="mt-4 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white">
                       Create a Campaign
@@ -785,9 +475,9 @@ export default function VideoCreatorPage() {
                   </Link>
                 </div>
               )}
-
+  
               {!loading && campaigns.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap- declaraciones6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {campaigns.map(campaign => (
                     <div
                       key={campaign.id}
@@ -828,7 +518,7 @@ export default function VideoCreatorPage() {
                           <Button
                             className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-sm py-1 px-3"
                           >
-                            Create Reel
+                            View Details
                           </Button>
                         </div>
                       </div>
@@ -838,7 +528,7 @@ export default function VideoCreatorPage() {
               )}
             </div>
           </ScrollArea>
-
+  
           {/* Full-Screen Campaign Details Overlay */}
           {selectedCampaign && (
             <div className="fixed inset-0 bg-gray-950/95 backdrop-blur-md z-50 overflow-y-auto">
@@ -851,7 +541,7 @@ export default function VideoCreatorPage() {
                   >
                     <X size={24} />
                   </button>
-
+  
                   {/* Hero Section */}
                   <div className="relative h-64 md:h-72 bg-gradient-to-br from-purple-900/50 to-blue-900/50 rounded-2xl overflow-hidden mb-8">
                     <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-blue-600/20 filter blur-3xl"></div>
@@ -868,7 +558,7 @@ export default function VideoCreatorPage() {
                       </div>
                     </div>
                   </div>
-
+  
                   {/* Main Content */}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Left Column: Campaign Details */}
@@ -924,345 +614,76 @@ export default function VideoCreatorPage() {
                         </p>
                       </div>
                     </div>
-
-                    {/* Right Columns: Video Editor */}
+  
+                    {/* Right Columns: Media and Influencers */}
                     <div className="lg:col-span-2 space-y-6">
-                      {/* Video Preview */}
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.6 }}
-                        className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-6 border border-purple-500/50 shadow-2xl shadow-purple-900/30 relative overflow-hidden"
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-blue-500/10 z-0"></div>
-                        <div className="absolute -top-24 -right-24 w-64 h-64 bg-purple-600/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '12s' }}></div>
-                        <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl animate-pulse" style={{ animationDuration: '15s' }}></div>
-                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4 relative z-10">
-                          <Play size={24} className="mr-2 animate-pulse" />
-                          Reel Preview
-                        </h2>
-                        <div className="relative w-[360px] h-[640px] mx-auto bg-gray-950 rounded-3xl overflow-hidden ring-4 ring-purple-500/30 shadow-xl">
-                          {selectedClips.length === 0 && !backgroundAudio ? (
-                            <div className="absolute inset-0 flex items-center justify-center text-gray-400 bg-gray-900/80">
-                              <Video size={48} className="mr-2 animate-bounce" />
-                              <span className="text-center">Select clips or audio to start creating your reel</span>
-                            </div>
-                          ) : (
-                            <Player
-                              ref={playerRef}
-                              component={VideoComposition}
-                              durationInFrames={totalDurationInFrames}
-                              compositionWidth={1080}
-                              compositionHeight={1920}
-                              fps={FPS}
-                              style={{ width: '100%', height: '100%' }}
-                              inputProps={{
-                                clips: selectedClips.map(clip => ({
-                                  src: clip.file_url,
-                                  start: clip.start,
-                                  end: clip.end
-                                })),
-                                audioTrack: backgroundAudio?.file_url,
-                                audioVolume,
-                                totalDurationInFrames
-                              }}
-                              loop={true}
-                              autoPlay={false}
-                            />
-                          )}
-                          <motion.div
-                            className="absolute bottom-4 left-4 right-4 flex justify-between items-center bg-gray-900/70 backdrop-blur-md rounded-full p-2"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.8 }}
-                          >
-                            <Button
-                              onClick={togglePlay}
-                              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-full p-3 hover:scale-110 transition-transform"
-                              disabled={!selectedClips.length && !backgroundAudio}
-                            >
-                              {isPlaying ? <PauseCircle size={28} /> : <PlayCircle size={28} />}
-                            </Button>
-                            <div className="flex items-center space-x-2 bg-gray-800/50 rounded-full px-3 py-1">
-                              <Volume2 size={20} className="text-purple-400" />
-                              <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                value={audioVolume}
-                                onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
-                                className="w-32 h-1 bg-gray-700 rounded-full accent-purple-500 cursor-pointer"
-                                disabled={!backgroundAudio}
-                              />
-                            </div>
-                           
-                          </motion.div>
-
-                          
-                        </div>
-
-                       <div style={{display: 'flex',justifyContent:'center',margin:'54px 0 0',position:'relative'}}>
-                        <Button
-                              onClick={handleRenderVideo}
-                              className={`bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-full p-3 hover:scale-110 transition-transform flex items-center ${rendering ? 'opacity-50 cursor-not-allowed' : ''}`}
-                              disabled={rendering || (!selectedClips.length && !backgroundAudio)}
-                            >
-                              {rendering ? (
-                                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-white mr-2"></div>
-                              ) : (
-                                <Film size={28} className="mr-2" />
-                              )}
-                              {rendering ? 'Rendering...' : 'Render Video'}
-                            </Button>
-                            </div>
-                      </motion.div>
-
-                      {/* Timeline */}
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 0.8 }}
-                        className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-purple-500/50 shadow-lg relative overflow-hidden"
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-blue-900/10 z-0"></div>
-                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4 relative z-10">
-                          <Film size={24} className="mr-2 animate-pulse" />
-                          Reel Timeline
-                        </h2>
-                        {selectedClips.length > 0 ? (
-                          <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-gray-800 relative z-10">
-                            <AnimatePresence>
-                              {selectedClips.map((clip, index) => (
-                                <motion.div
-                                  key={clip.id}
-                                  drag="x"
-                                  dragControls={dragControls}
-                                  dragConstraints={{ left: 0, right: 0 }}
-                                  onDragEnd={(e, info) => {
-                                    const newIndex = Math.round((index + info.offset.x / 200));
-                                    if (newIndex !== index && newIndex >= 0 && newIndex < selectedClips.length) {
-                                      reorderClips(index, newIndex);
-                                    }
-                                  }}
-                                  initial={{ opacity: 0, scale: 0.8 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.8 }}
-                                  className="flex-shrink-0 w-56 bg-gray-800/70 rounded-xl p-4 border border-purple-500/40 hover:border-purple-400 transition-all shadow-md hover:shadow-purple-500/30 cursor-move"
-                                >
-                                  <div className="relative aspect-[9/16] mb-3 rounded-lg overflow-hidden">
-                                    <video
-                                      src={clip.file_url}
-                                      className="w-full h-full object-cover"
-                                      muted
-                                      onError={(e) => console.error(`Error loading timeline video ${clip.file_url}:`, e)}
-                                    />
-                                    <button
-                                      onClick={() => setSelectedClips(selectedClips.filter(c => c.id !== clip.id))}
-                                      className="absolute top-2 right-2 bg-red-600 rounded-full p-1.5 hover:bg-red-500 transition-colors"
-                                    >
-                                      <X size={16} />
-                                    </button>
-                                    <div className="absolute top-2 left-2 bg-gray-900/80 rounded-full p-1.5">
-                                      <GripVertical size={16} className="text-gray-300" />
-                                    </div>
-                                  </div>
-                                  <div className="text-sm text-gray-200 font-medium truncate mb-2">{clip.name || `Clip ${index + 1}`}</div>
-                                  <div className="flex space-x-2">
-                                    <input
-                                      type="number"
-                                      value={clip.start.toFixed(2)}
-                                      onChange={(e) => updateClipTiming(clip.id, 'start', parseFloat(e.target.value))}
-                                      className="w-20 bg-gray-700/50 text-white rounded-lg px-2 py-1 text-sm border border-gray-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-                                      placeholder="Start (s)"
-                                      min="0"
-                                      max={(clipDurations[clip.id] || 10) - 0.1}
-                                      step="0.1"
-                                    />
-                                    <input
-                                      type="number"
-                                      value={clip.end.toFixed(2)}
-                                      onChange={(e) => updateClipTiming(clip.id, 'end', parseFloat(e.target.value))}
-                                      className="w-20 bg-gray-700/50 text-white rounded-lg px-2 py-1 text-sm border border-gray-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-                                      placeholder="End (s)"
-                                      min={(clip.start || 0) + 0.1}
-                                      max={clipDurations[clip.id] || 10}
-                                      step="0.1"
-                                    />
-                                  </div>
-                                </motion.div>
-                              ))}
-                            </AnimatePresence>
-                          </div>
-                        ) : (
-                          <div className="text-center text-gray-400 py-6">
-                            <Film size={36} className="mx-auto mb-3 animate-pulse" />
-                            <p>Add clips to the timeline to craft your reel</p>
-                          </div>
-                        )}
-                      </motion.div>
-
-                      {/* Media Selection */}
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 1 }}
-                        className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-purple-500/50 shadow-lg relative overflow-hidden"
-                      >
-                        <div className="absolute inset-0 bg-gradient-to ladrillos-to-br from-purple-900/10 to-blue-900/10 z-0"></div>
-                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4 relative z-10">
-                          <Video size={24} className="mr-2 animate-pulse" />
-                          Campaign Media
+                      {/* Media Section */}
+                      <div className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-gray-800/50 shadow-lg animate-fadeIn" style={{ animationDelay: '0.6s' }}>
+                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4">
+                          <Play size={24} className="mr-2" />
+                          Media Content
                         </h2>
                         {selectedCampaign.campaign_media?.length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {selectedCampaign.campaign_media.map((media, index) => (
-                              <motion.div
+                              <div
                                 key={index}
-                                whileHover={{ scale: 1.05, rotate: 1 }}
-                                whileTap={{ scale: 0.95 }}
-                                className={`bg-gray-800/70 rounded-xl p-4 border ${selectedClips.some(clip => clip.id === media.id) || backgroundAudio?.id === media.id ? 'border-purple-500/50 shadow-purple-500/30' : 'border-gray-700/50'} transition-all shadow-md hover:shadow-lg relative z-10`}
+                                className="bg-gray-800/50 rounded-xl p-4 border border-gray-700/50 hover:border-purple-500/30 transition-all"
                               >
-                                <div className="flex items-center mb-3">
+                                <div className="flex items-center mb-2">
                                   <div className="p-2 bg-purple-900/30 rounded-lg border border-purple-500/30 mr-2">
                                     {media.file_type === 'audio' ? (
-                                      <Volume2 size={18} className="text-purple-400" />
+                                      <Volume2 size={16} className="text-purple-400" />
                                     ) : (
-                                      <Video size={18} className="text-blue-400" />
+                                      <Video size={16} className="text-blue-400" />
                                     )}
                                   </div>
-                                  <h3 className="text-md font-semibold text-white truncate">
-                                    {media.file_type === 'audio' ? 'Audio Track' : 'Video Clip'} {index + 1}
+                                  <h3 className="text-md font-medium text-white">
+                                    {media.file_type === 'audio' ? 'Audio' : 'Video'} {index + 1}
                                   </h3>
                                 </div>
                                 {media.file_type === 'audio' ? (
-                                  <div className="space-y-3">
-                                    <audio
-                                      controls
-                                      className="w-full bg-gray-800/50 rounded-lg h-10"
-                                      onError={(e) => console.error(`Error loading audio ${media.file_url}:`, e)}
-                                    >
+                                  <div className="relative mt-2">
+                                    <audio controls className="w-full bg-gray-800/50 rounded-lg">
                                       <source src={media.file_url} type="audio/mpeg" />
+                                      Your browser does not support the audio element.
                                     </audio>
-                                    <Button
-                                      onClick={() => handleAudioSelect(media)}
-                                      className={`w-full text-sm font-medium ${backgroundAudio?.id === media.id ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-700 hover:bg-gray-600'} rounded-lg py-2 transition-all`}
-                                    >
-                                      {backgroundAudio?.id === media.id ? 'Selected' : 'Use as Background Audio'}
-                                    </Button>
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-blue-500 rounded-t-lg opacity-20"></div>
                                   </div>
                                 ) : (
-                                  <div className="relative aspect-[9/16] rounded-lg overflow-hidden">
-                                    <video
-                                      src={media.file_url}
-                                      className="w-full h-full object-cover"
-                                      muted
-                                      onError={(e) => console.error(`Error loading video ${media.file_url}:`, e)}
-                                    />
-                                    <Button
-                                      onClick={() => handleClipSelect(media)}
-                                      className={`absolute bottom-2 right-2 text-sm font-medium ${selectedClips.some(clip => clip.id === media.id) ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-700 hover:bg-gray-600'} rounded-lg px-3 py-1.5 transition-all`}
-                                    >
-                                      {selectedClips.some(clip => clip.id === media.id) ? 'Selected' : 'Add to Reel'}
-                                    </Button>
+                                  <div className="relative aspect-video mt-2">
+                                    <video controls className="w-full rounded-lg shadow-md">
+                                      <source src={media.file_url} type="video/mp4" />
+                                      Your browser does not support the video element.
+                                    </video>
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-blue-500 rounded-t-lg opacity-20"></div>
                                   </div>
                                 )}
-                              </motion.div>
+                              </div>
                             ))}
                           </div>
                         ) : (
                           <div className="bg-gray-800/40 rounded-xl p-6 border border-gray-700/50 text-center">
-                            <Video size={36} className="mx-auto text-gray-500 mb-3 animate-pulse" />
+                            <Video size={36} className="mx-auto text-gray-500 mb-3" />
                             <p className="text-gray-400">No media files available for this campaign.</p>
                           </div>
                         )}
-                      </motion.div>
-
-                      {/* Upload Clips */}
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 1.2 }}
-                        className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-purple-500/50 shadow-lg relative overflow-hidden"
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-blue-900/10 z-0"></div>
-                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4 relative z-10">
-                          <Upload size={24} className="mr-2 animate-pulse" />
-                          Upload Your Clips
-                        </h2>
-                        <div className="bg-gray-800/40 rounded-xl p-6 border-2 border-dashed border-purple-500/50 text-center relative z-10">
-                          <input
-                            type="file"
-                            accept="video/*"
-                            multiple
-                            onChange={handleFileUpload}
-                            className="hidden"
-                            ref={fileInputRef}
-                          />
-                          <Button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg px-6 py-3 font-medium shadow-md hover:shadow-lg transition-all"
-                          >
-                            <Upload size={20} className="mr-2" />
-                            Upload Reel Clips
-                          </Button>
-                        </div>
-                        {uploadedClips.length > 0 && (
-                          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {uploadedClips.map((clip, index) => (
-                              <motion.div
-                                key={clip.id}
-                                whileHover={{ scale: 1.05, rotate: 1 }}
-                                whileTap={{ scale: 0.95 }}
-                                className={`bg-gray-800/70 rounded-xl p-4 border ${selectedClips.some(c => c.id === clip.id) ? 'border-purple-500/50 shadow-purple-500/30' : 'border-gray-700/50'} transition-all shadow-md hover:shadow-lg relative z-10`}
-                              >
-                                <div className="flex items-center mb-3">
-                                  <div className="p-2 bg-purple-900/30 rounded-lg border border-purple-500/30 mr-2">
-                                    <Video size={18} className="text-blue-400" />
-                                  </div>
-                                  <h3 className="text-md font-semibold text-white truncate">{clip.name}</h3>
-                                </div>
-                                <div className="relative aspect-[9/16] rounded-lg overflow-hidden">
-                                  <video
-                                    src={clip.file_url}
-                                    className="w-full h-full object-cover"
-                                    muted
-                                    onError={(e) => console.error(`Error loading uploaded video ${clip.file_url}:`, e)}
-                                  />
-                                  <Button
-                                    onClick={() => handleUploadedClipSelect(clip)}
-                                    className={`absolute bottom-2 right-2 text-sm font-medium ${selectedClips.some(c => c.id === clip.id) ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-700 hover:bg-gray-600'} rounded-lg px-3 py-1.5 transition-all`}
-                                  >
-                                    {selectedClips.some(c => c.id === clip.id) ? 'Selected' : 'Add to Reel'}
-                                  </Button>
-                                </div>
-                              </motion.div>
-                            ))}
-                          </div>
-                        )}
-                      </motion.div>
-
+                      </div>
+  
                       {/* Selected Influencers */}
-                      <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.5, delay: 1.4 }}
-                        className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-purple-500/50 shadow-lg relative overflow-hidden"
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/10 to-blue-900/10 z-0"></div>
-                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4 relative z-10">
-                          <Users size={24} className="mr-2 animate-pulse" />
+                      <div className="bg-gray-900/60 backdrop-blur-md rounded-2xl p-6 border border-gray-800/50 shadow-lg animate-fadeIn" style={{ animationDelay: '0.8s' }}>
+                        <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400 flex items-center mb-4">
+                          <Users size={24} className="mr-2" />
                           Selected Influencers
                         </h2>
                         {selectedCampaign.selected_influencers?.length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {selectedCampaign.selected_influencers.map((channelId) => {
                               const influencer = influencers[channelId];
                               return (
-                                <motion.div
+                                <div
                                   key={channelId}
-                                  whileHover={{ scale: 1.02 }}
-                                  className="bg-gray-800/70 p-4 rounded-xl border border-gray-700/50 hover:border-purple-500/30 transition-all shadow-md hover:shadow-lg relative z-10"
+                                  className="bg-gray-800/50 p-4 rounded-xl border border-gray-700/50 hover:border-purple-500/30 transition-all"
                                 >
                                   <div className="flex items-center">
                                     {influencer?.thumbnail_url ? (
@@ -1303,17 +724,17 @@ export default function VideoCreatorPage() {
                                       </div>
                                     </div>
                                   </div>
-                                </motion.div>
+                                </div>
                               );
                             })}
                           </div>
                         ) : (
                           <div className="bg-gray-800/40 rounded-xl p-6 border border-gray-700/50 text-center">
-                            <Users size={32} className="mx-auto text-gray-500 mb-2 animate-pulse" />
+                            <Users size={32} className="mx-auto text-gray-500 mb-2" />
                             <p className="text-gray-400">No influencers selected for this campaign.</p>
                           </div>
                         )}
-                      </motion.div>
+                      </div>
                     </div>
                   </div>
                 </div>

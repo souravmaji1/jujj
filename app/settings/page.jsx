@@ -14,7 +14,10 @@ import {
   Music,
   Users,
   Sparkles,
+  User,Briefcase,
   Zap,
+  SquarePlus,
+  ChartColumnDecreasing,
   Plus,
   Check,
   X,
@@ -39,7 +42,7 @@ export default function SettingsPage() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
-
+  const [userRole, setUserRole] = useState('seller');
   // Fetch connected Google account from Supabase
   useEffect(() => {
     if (!user) return;
@@ -322,118 +325,168 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 py-6 px-4">
-          <div
-            className={`mb-8 transition-all duration-500 ${
-              isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'
-            }`}
-          >
-            {sidebarOpen && (
-              <div className="flex items-center justify-between px-4 mb-4">
-                <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Main Menu</h3>
-                <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
-              </div>
-            )}
-            <ul className="space-y-2">
-              <NavItem
-                icon={<Home size={20} />}
-                label="Dashboard"
-                active={selectedNav === 'dashboard'}
-                onClick={() => setSelectedNav('dashboard')}
-                href="/dashboard"
-              />
-              <NavItem
-                icon={<Video size={20} />}
-                label="Create Videos"
-                active={selectedNav === 'create'}
-                onClick={() => setSelectedNav('create')}
-                href="/create"
-              />
-              <NavItem
-                icon={<BookOpen size={20} />}
-                label="Video Library"
-                active={selectedNav === 'library'}
-                onClick={() => setSelectedNav('library')}
-                href="/videolibrary"
-              />
-              <NavItem
-                icon={<Music size={20} />}
-                label="Your Stats"
-                active={selectedNav === 'stats'}
-                onClick={() => setSelectedNav('stats')}
-                href="/stats"
-              />
-            </ul>
-          </div>
-
-          <div
-            className={`mb-8 transition-all duration-500 delay-100 ${
-              isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'
-            }`}
-          >
-            {sidebarOpen && (
-              <div className="flex items-center justify-between px-4 mb-4">
-                <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Workspace</h3>
-                <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
-              </div>
-            )}
-            <ul className="space-y-2">
-              <NavItem
-                icon={<Users size={20} />}
-                label="Pricing"
-                active={selectedNav === 'pricing'}
-                onClick={() => setSelectedNav('pricing')}
-                href="/pricing"
-              />
-              <NavItem
-                icon={<Settings size={20} />}
-                label="Settings"
-                active={selectedNav === 'settings'}
-                onClick={() => setSelectedNav('settings')}
-                href="/settings"
-              />
-            </ul>
-          </div>
-
-          {sidebarOpen && (
-            <div
-              className={`mt-8 transition-all duration-500 delay-200 ${
-                isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'
-              }`}
-            >
-              <div className="relative overflow-hidden rounded-2xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40 z-0 pointer-events-none"></div>
-                <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-purple-500/20 rounded-full blur-xl z-0 pointer-events-none"></div>
-                <div className="absolute -top-6 -left-6 w-24 h-24 bg-blue-500/20 rounded-full blur-xl z-0 pointer-events-none"></div>
-
-                <div className="relative p-6 backdrop-blur-sm border border-purple-500/20 rounded-2xl z-10">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <div className="p-3 bg-gradient-to-br from-purple-500/30 to-blue-500/30 rounded-xl border border-purple-500/20 shadow-inner shadow-purple-500/10">
-                      <Sparkles size={20} className="text-purple-300" />
+         <ScrollArea className="flex-1 py-6 px-4">
+                  <div className="mb-8">
+                    {sidebarOpen && (
+                      <div className="px-4 mb-4">
+                        <div className="flex space-x-2 mb-4">
+                          <Button
+                            onClick={() => setUserRole('buyer')}
+                            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all
+                              ${userRole === 'buyer'
+                                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md'
+                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+                          >
+                            <User size={16} className="mr-2" />
+                            Buyer
+                          </Button>
+                          <Button
+                            onClick={() => setUserRole('seller')}
+                            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all
+                              ${userRole === 'seller'
+                                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md'
+                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+                          >
+                            <Briefcase size={16} className="mr-2" />
+                            Seller
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {sidebarOpen && (
+                      <div className="flex items-center justify-between px-4 mb-4">
+                        <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">{userRole === 'buyer' ? 'Main Menu' : 'Seller Dashboard'}</h3>
+                        <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
+                      </div>
+                    )}
+                    <ul className="space-y-2">
+                      {userRole === 'buyer' ? (
+                        <>
+                         <NavItem
+                            icon={<Home size={20} />}
+                            label="Dashboard"
+                            active={selectedNav === 'dashboard'}
+                            onClick={() => setSelectedNav('dashboard')}
+                            href="/dashboard"
+                          />
+                          <NavItem
+                            icon={<SquarePlus size={20} />}
+                            label="Create Campaign"
+                            active={selectedNav === 'create'}
+                            onClick={() => setSelectedNav('create')}
+                            href="/createcampaign"
+                          />
+                          <NavItem
+                            icon={<BookOpen size={20} />}
+                            label="Manage Campaign"
+                            active={selectedNav === 'library'}
+                            onClick={() => setSelectedNav('library')}
+                            href="/managecampaign"
+                          />
+                          <NavItem
+                            icon={<ChartColumnDecreasing size={20} />}
+                            label="Your Stats"
+                            active={selectedNav === 'stats'}
+                            onClick={() => setSelectedNav('stats')}
+                            href="/campaignstats"
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <NavItem 
+                            icon={<User size={20} />} 
+                            label="Profile Settings" 
+                            active={selectedNav === 'profile'}
+                            onClick={() => setSelectedNav('profile')}
+                            href="/profilesetting"
+                          />
+                          <NavItem 
+                            icon={<Video size={20} />} 
+                            label="Manage Campaign" 
+                            active={selectedNav === 'manage'} 
+                            onClick={() => setSelectedNav('manage')}
+                            href="/createcollab"
+                          />
+                         
+                          <NavItem 
+                            icon={<Sparkles size={20} />} 
+                            label="AI Post Generate" 
+                            active={selectedNav === 'ai-generate'} 
+                            onClick={() => setSelectedNav('ai-generate')}
+                            href="/ai-post-generate"
+                          />
+                          <NavItem 
+                            icon={<Settings size={20} />} 
+                            label="Settings" 
+                            active={selectedNav === 'settings'} 
+                            onClick={() => setSelectedNav('settings')}
+                            href="/settings"
+                          />
+                        </>
+                      )}
+                    </ul>
+                  </div>
+        
+                  {userRole === 'buyer' && (
+                    <div className={`mb-8 transition-all duration-500 delay-100 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
+                      {sidebarOpen && (
+                        <div className="flex items-center justify-between px-4 mb-4">
+                          <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Marketplace</h3>
+                          <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
+                        </div>
+                      )}
+                      <ul className="space-y-2">
+                        <NavItem 
+                          icon={<Users size={20} />} 
+                          label="Accounts" 
+                          active={selectedNav === 'pricing'} 
+                          onClick={() => setSelectedNav('pricing')}
+                          href="/rentaccounts"
+                        />
+                        <NavItem 
+                          icon={<Settings size={20} />} 
+                          label="Settings" 
+                          active={selectedNav === 'settings'} 
+                          onClick={() => setSelectedNav('settings')}
+                          href="/settings"
+                        />
+                      </ul>
                     </div>
-                    <h4 className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">
-                      Pro Features
-                    </h4>
-                  </div>
-                  <p className="text-sm text-gray-300 mb-4 leading-relaxed">
-                    Unlock AI video enhancements, unlimited storage, and team collaboration.
-                  </p>
-                  <div className="w-full h-1.5 bg-gray-800/60 rounded-full mb-2 overflow-hidden">
-                    <div className="h-full w-3/4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"></div>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-gray-400 mb-4">
-                    <span>75% complete</span>
-                    <span>7 days left</span>
-                  </div>
-                  <button className="w-full py-3 text-sm font-medium rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 flex items-center justify-center group z-50 relative">
-                    <Zap size={16} className="mr-2 group-hover:animate-pulse" />
-                    Upgrade Now
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </ScrollArea>
+                  )}
+        
+                  {sidebarOpen && (
+                    <div className={`mt-8 transition-all duration-500 delay-200 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
+                      <div className="relative overflow-hidden rounded-2xl">
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40 z-0 pointer-events-none"></div>
+                        <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-purple-500/20 rounded-full blur-xl z-0 pointer-events-none"></div>
+                        <div className="absolute -top-6 -left-6 w-24 h-24 bg-blue-500/20 rounded-full blur-xl z-0 pointer-events-none"></div>
+                        
+                        <div className="relative p-6 backdrop-blur-sm border border-purple-500/20 rounded-2xl z-10">
+                          <div className="flex items-center space-x-3 mb-4">
+                            <div className="p-3 bg-gradient-to-br from-purple-500/30 to-blue-500/30 rounded-xl border border-purple-500/20 shadow-inner shadow-purple-500/10">
+                              <Sparkles size={20} className="text-purple-300" />
+                            </div>
+                            <h4 className="font-bold text-lg bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-blue-400">Pro Features</h4>
+                          </div>
+                          <p className="text-sm text-gray-300 mb-4 leading-relaxed">
+                            Unlock AI video enhancements, unlimited storage, and team collaboration.
+                          </p>
+                          <div className="w-full h-1.5 bg-gray-800/60 rounded-full mb-2 overflow-hidden">
+                            <div className="h-full w-3/4 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"></div>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-gray-400 mb-4">
+                            <span>75% complete</span>
+                            <span>7 days left</span>
+                          </div>
+                          <button className="w-full py-3 text-sm font-medium rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 flex items-center justify-center group z-50 relative">
+                            <Zap size={16} className="mr-2 group-hover:animate-pulse" />
+                            Upgrade Now
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </ScrollArea>
 
         <div className="p-4 border-t border-gray-800/50">
           <button className="w-full flex items-center justify-center py-4 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-500 hover:to-blue-500 transition-all shadow-lg shadow-purple-900/20 hover:shadow-purple-900/40 group relative overflow-hidden z-50">
@@ -483,7 +536,7 @@ export default function SettingsPage() {
         </header>
 
         <div className="flex-1 overflow-auto p-8">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-blue-400">
                 Account Settings

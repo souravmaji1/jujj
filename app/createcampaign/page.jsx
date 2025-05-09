@@ -20,6 +20,8 @@ import {
   X,
   AlertCircle,
   CheckCircle,
+  SquarePlus,
+  ChartColumnDecreasing,
   Upload,
   FileMusic,
   UserPlus,
@@ -131,11 +133,11 @@ export default function SettingsPage() {
   // Navigate to appropriate page based on user role
   useEffect(() => {
     if (userRole === 'buyer') {
-      setSelectedNav('profile');
-      router.push('/blog');
-    } else {
       setSelectedNav('create');
-      router.push('/generate');
+      router.push('/createcampaign');
+    } else {
+      setSelectedNav('settings');
+      router.push('/settings');
     }
   }, [userRole, router]);
 
@@ -512,33 +514,33 @@ export default function SettingsPage() {
             <ul className="space-y-2">
               {userRole === 'buyer' ? (
                 <>
-                  <NavItem 
-                    icon={<Home size={20} />} 
-                    label="Dashboard" 
+                 <NavItem
+                    icon={<Home size={20} />}
+                    label="Dashboard"
                     active={selectedNav === 'dashboard'}
                     onClick={() => setSelectedNav('dashboard')}
                     href="/dashboard"
                   />
-                  <NavItem 
-                    icon={<Video size={20} />} 
-                    label="Create Campaign" 
-                    active={selectedNav === 'create'} 
+                  <NavItem
+                    icon={<SquarePlus size={20} />}
+                    label="Create Campaign"
+                    active={selectedNav === 'create'}
                     onClick={() => setSelectedNav('create')}
-                    href="/create"
+                    href="/createcampaign"
                   />
-                  <NavItem 
-                    icon={<BookOpen size={20} />} 
-                    label="Manage Campaign" 
-                    active={selectedNav === 'library'} 
+                  <NavItem
+                    icon={<BookOpen size={20} />}
+                    label="Manage Campaign"
+                    active={selectedNav === 'library'}
                     onClick={() => setSelectedNav('library')}
-                    href="/videolibrary"
+                    href="/managecampaign"
                   />
-                  <NavItem 
-                    icon={<Music size={20} />} 
-                    label="Your Stats" 
-                    active={selectedNav === 'stats'} 
+                  <NavItem
+                    icon={<ChartColumnDecreasing size={20} />}
+                    label="Your Stats"
+                    active={selectedNav === 'stats'}
                     onClick={() => setSelectedNav('stats')}
-                    href="/stats"
+                    href="/campaignstats"
                   />
                 </>
               ) : (
@@ -587,17 +589,17 @@ export default function SettingsPage() {
             <div className={`mb-8 transition-all duration-500 delay-100 ${isAnimating ? 'opacity-0 transform translate-y-4' : 'opacity-100 transform translate-y-0'}`}>
               {sidebarOpen && (
                 <div className="flex items-center justify-between px-4 mb-4">
-                  <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Workspace</h3>
+                  <h3 className="text-xs uppercase text-gray-500 font-semibold tracking-wider">Marketplace</h3>
                   <div className="w-8 h-0.5 bg-gray-800 rounded-full"></div>
                 </div>
               )}
               <ul className="space-y-2">
                 <NavItem 
                   icon={<Users size={20} />} 
-                  label="Pricing" 
+                  label="Accounts" 
                   active={selectedNav === 'pricing'} 
                   onClick={() => setSelectedNav('pricing')}
-                  href="/pricing"
+                  href="/rentaccounts"
                 />
                 <NavItem 
                   icon={<Settings size={20} />} 

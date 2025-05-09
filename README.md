@@ -20,3 +20,6 @@ Waiting for your feedback!
  const githubToken = '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';
       const repoOwner = 'souravmaji1';
       const repoName = 'jujj';
+
+
+      pexels api = YZEvlBMM1hpvg0aZ6MMqzfudkMSgasdeorLGZAwoyt3R8uoM0l6mtVwU
