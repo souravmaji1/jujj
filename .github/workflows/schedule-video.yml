@@ -1,28 +1,4 @@
 name: Schedule Video Rendering
 
-on:
-  schedule:
-    - cron: '*/1 * * * *'
 
-jobs:
-  schedule:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install Dependencies
-        run: npm install @supabase/supabase-js axios adm-zip
-
-      - name: Run Automation Script
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SECRET: ${{ secrets.SUPABASE_SECRET }}
-          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: node scripts/run-automation.js
